@@ -8,6 +8,7 @@ import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import kotlinx.coroutines.*
 import okhttp3.*
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import java.io.File
 import java.net.DatagramPacket
 import java.net.DatagramSocket
@@ -19,7 +20,7 @@ class NetworkService : Service() {
     private val client = OkHttpClient()
 
     private val SERVER_URL = "https://httpbin.org/bytes/1048576" 
-    private val IPERF_SERVER_IP = "192.168.1.100" // Cambiar por tu servidor objetivo
+    private val IPERF_SERVER_IP = "192.168.1.100"
     private val TRACKER_UDP_IP = "tracker.opentrackr.org"
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -56,7 +57,9 @@ class NetworkService : Service() {
                 while (inputStream?.read(buffer) != -1 && serviceScope.isActive) {}
             }
 
-            val body = RequestBody.create(MediaType.parse("text/plain"), "payload_sincronizacion")
+            // Uso corregido con .toMediaTypeOrNull()
+            val mediaType = "text/plain".toMediaTypeOrNull()
+            val body = RequestBody.create(mediaType, "payload_sincronizacion")
             val requestPost = Request.Builder().url(SERVER_URL).post(body).build()
             client.newCall(requestPost).execute().close()
         } catch (e: Exception) {
