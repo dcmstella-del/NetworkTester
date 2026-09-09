@@ -14,6 +14,17 @@ android {
         versionCode = 1
         versionName = "1.0"
     }
+
+    // Configuración de compatibilidad de Java a versión 17
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    // Configuración del target de Kotlin a versión 17
+    kotlinOptions {
+        jvmTarget = "17"
+    }
 }
 
 dependencies {
