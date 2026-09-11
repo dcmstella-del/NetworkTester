@@ -25,6 +25,7 @@ class MainActivity : AppCompatActivity() {
             val mensaje = intent?.getStringExtra("LOG_MESSAGE") ?: return
             tvLogs.append("$mensaje\n")
             
+            // Auto-scroll hacia abajo
             scrollView.post {
                 scrollView.fullScroll(ScrollView.FOCUS_DOWN)
             }
@@ -35,7 +36,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // Solicitar permiso de notificaciones dinámicamente en Android 13+
+        // Solicitar permiso de notificaciones en Android 13+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) 
                 != PackageManager.PERMISSION_GRANTED) {
@@ -72,7 +73,8 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         val filter = IntentFilter("com.example.networktester.LOG_EVENT")
-        // Compatibilidad de registro Broadcast para distintas versiones de Android
+        
+        // RECEIVER_EXPORTED permite que los broadcasts internos se entreguen sin bloqueos en Android 14
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(logReceiver, filter, RECEIVER_EXPORTED)
         } else {
