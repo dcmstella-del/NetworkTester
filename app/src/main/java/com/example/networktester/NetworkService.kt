@@ -58,21 +58,35 @@ class NetworkService : Service() {
         sendBroadcast(intent)
     }
 
-    private fun lanzarCargasYDescargasContinuas() {
+   private fun lanzarCargasYDescargasContinuas() {
         serviceScope.launch {
+            val downloadUrl = "https://speed.cloudflare.com/__down?bytes=100000000" // 100 MB reales
             while (isActive) {
                 try {
-                    logToUI("⬇️ [DESCARGA] Descargando bloque de datos...")
-                    val requestGet = Request.Builder().url(DOWNLOAD_URL).build()
+                    logToUI("⬇️ [DESCARGA] Descargando bloque de 100 MB...")
+                    val requestGet = Request.Builder()
+                        .url(downloadUrl)
+                        .header("User-Agent", "Mozilla/5.0")
+                        .build()
+
                     client.newCall(requestGet).execute().use { response ->
+                        if (!response.isSuccessful) {
+                            logToUI("⚠️ [DESCARGA HTTP ERROR] Código: ${response.code}")
+                            delay(1000)
+                            return@use
+                        }
+
                         val inputStream = response.body?.byteStream()
-                        val buffer = ByteArray(65536)
-                        var bytesRead = 0
-                        var totalDownloaded = 0
+                        val buffer = ByteArray(65536) // Buffer de 64KB
+                        var bytesRead: Int
+                        var totalDownloaded = 0L
+
                         while (inputStream?.read(buffer).also { bytesRead = it ?: -1 } != -1 && isActive) {
                             totalDownloaded += bytesRead
                         }
-                        logToUI("✅ [DESCARGA FIN] Finalizados ${totalDownloaded / 1024 / 1024} MB")
+                        
+                        val mbDownloaded = totalDownloaded / (1024 * 1024)
+                        logToUI("✅ [DESCARGA FIN] Finalizados $mbDownloaded MB")
                     }
                 } catch (e: Exception) {
                     logToUI("⚠️ [DESCARGA ERROR] ${e.localizedMessage}")
