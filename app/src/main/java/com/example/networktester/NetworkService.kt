@@ -49,10 +49,11 @@ class NetworkService : Service() {
         return START_STICKY
     }
 
-    private fun logToUI(mensaje: String) {
+   private fun logToUI(mensaje: String) {
         val hora = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
         val intent = Intent("com.example.networktester.LOG_EVENT").apply {
             putExtra("LOG_MESSAGE", "[$hora] $mensaje")
+            setPackage(packageName) // Garantiza la entrega dentro de la misma aplicación
         }
         sendBroadcast(intent)
     }
