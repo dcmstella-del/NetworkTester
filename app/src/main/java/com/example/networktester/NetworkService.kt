@@ -22,7 +22,7 @@ class NetworkService : Service() {
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val client = OkHttpClient.Builder().retryOnConnectionFailure(true).build()
 
-    private val DOWNLOAD_URL = "https://speed.hetzner.de/100MB.bin"
+    private val DOWNLOAD_URL = "https://speed.cloudflare.com/__down?bytes=25000000"
     private val UPLOAD_URL = "https://httpbin.org/post"
     private val IPERF_SERVER_IP = "192.168.1.100"
     private val TRACKER_UDP_IP = "tracker.opentrackr.org"
