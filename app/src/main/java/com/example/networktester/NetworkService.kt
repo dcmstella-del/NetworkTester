@@ -163,7 +163,7 @@ class NetworkService : Service() {
                         process.waitFor()
                         logToUI("✅ [IPERF3 FIN] Prueba iperf3 finalizada")
                     } else {
-                        logToUI("ℹ️ [IPERF3] Binario iperf3 no encontrado en assets")
+                        //ogToUI("ℹ️ [IPERF3] Binario iperf3 no encontrado en assets")
                     }
                 } catch (e: Exception) {
                     logToUI("⚠️ [IPERF3 ERROR] Fallo ejecución")
