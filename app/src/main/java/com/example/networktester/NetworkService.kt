@@ -1,6 +1,8 @@
 package com.example.networktester
 
-import android.app.*
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.os.Build
@@ -52,7 +54,6 @@ class NetworkService : Service() {
         correoDestino = intent?.getStringExtra("CORREO") ?: ""
         horaProgramada = intent?.getStringExtra("HORA") ?: "23:00"
 
-        // Escalado para consumo masivo (Full Burst = 32 hilos concurrentes -> ~1 GB/min)
         hilosDescarga = when (multiplicador) {
             2 -> 18
             4 -> 32
@@ -110,7 +111,7 @@ class NetworkService : Service() {
                     socket.close()
                     logToUI("🌊 [UDP] Ráfaga de $paquetesAEnviar paquetes enviada")
                 } catch (e: Exception) {
-                    // Control silencioso
+                    // Control de errores de red
                 }
                 delay((300 / multiplicador).toLong())
             }
@@ -235,7 +236,7 @@ class NetworkService : Service() {
                     if (response.isSuccessful) {
                         logToUI("✉️ [CORREO ENVIADO EXITOSAMENTE] Revisa tu bandeja de entrada o Spam.")
                     } else {
-                        logToUI("⚠️ [CORREO ERROR HTTP] Código: ${response.code()}")
+                        logToUI("⚠️ [CORREO ERROR HTTP] Código: ${response.code}")
                     }
                 }
             } catch (e: Exception) {
@@ -266,7 +267,8 @@ class NetworkService : Service() {
     private fun crearCanalNotificacion() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel("NetworkTesterChannel", "Pruebas de Red", NotificationManager.IMPORTANCE_LOW)
-            getSystemService(NotificationManager::class.java)?.createNotificationChannel(channel)
+            val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            manager.createNotificationChannel(channel)
         }
     }
 
