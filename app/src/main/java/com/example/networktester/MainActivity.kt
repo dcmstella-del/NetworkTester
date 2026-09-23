@@ -20,6 +20,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvTotalDatos: TextView
     private lateinit var scrollViewLogs: ScrollView
     private lateinit var rgIntensidad: RadioGroup
+    private lateinit var etEmail: EditText
+    private lateinit var etHoraEnvio: EditText
 
     private val dataReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -59,6 +61,8 @@ class MainActivity : AppCompatActivity() {
         tvTotalDatos = findViewById(R.id.tvTotalDatos)
         scrollViewLogs = findViewById(R.id.scrollViewLogs)
         rgIntensidad = findViewById(R.id.rgIntensidad)
+        etEmail = findViewById(R.id.etEmail)
+        etHoraEnvio = findViewById(R.id.etHoraEnvio)
 
         val btnStart = findViewById<Button>(R.id.btnStart)
         val btnStop = findViewById<Button>(R.id.btnStop)
@@ -70,8 +74,13 @@ class MainActivity : AppCompatActivity() {
                 else -> 1
             }
 
+            val correo = etEmail.text.toString().trim()
+            val hora = etHoraEnvio.text.toString().trim().ifEmpty { "23:00" }
+
             val intent = Intent(this, NetworkService::class.java).apply {
                 putExtra("MULTIPLICADOR", multiplicador)
+                putExtra("CORREO", correo)
+                putExtra("HORA", hora)
             }
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -79,7 +88,7 @@ class MainActivity : AppCompatActivity() {
             } else {
                 startService(intent)
             }
-            tvLogs.append("\n[SISTEMA] Iniciando servicio en modo x$multiplicador...\n")
+            tvLogs.append("\n[SISTEMA] Servicio iniciado en modo x$multiplicador. Reporte programado a las $hora...\n")
         }
 
         btnStop.setOnClickListener {
