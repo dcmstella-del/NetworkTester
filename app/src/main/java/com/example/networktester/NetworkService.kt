@@ -31,9 +31,10 @@ class NetworkService : Service() {
     private val serviceJob = SupervisorJob()
     private val serviceScope = CoroutineScope(Dispatchers.IO + serviceJob)
 
+    // Ajustamos la piscina de conexiones para evitar fuga de socket y memoria
     private val dispatcher = Dispatcher().apply {
-        maxRequests = 10000
-        maxRequestsPerHost = 2000
+        maxRequests = 500
+        maxRequestsPerHost = 100
     }
 
     private val client = OkHttpClient.Builder()
@@ -83,7 +84,7 @@ class NetworkService : Service() {
         lanzarRafagasUdp()
         lanzarPeticionesPostCloud()
         lanzarSpeedTestLatencia()
-        lanzarDescargasMasivasAgresivas()
+        lanzarDescargasMasivasOptimizadas()
         lanzarSincronizadorDiario()
         lanzarActualizadorUI()
 
@@ -100,7 +101,7 @@ class NetworkService : Service() {
         serviceScope.launch {
             while (isActive) {
                 actualizarMetricasUI()
-                delay(250)
+                delay(300)
             }
         }
     }
@@ -114,7 +115,7 @@ class NetworkService : Service() {
             val buffer = mensajeUdp.toByteArray()
 
             val paquetesPorRafaga = when (multiplicador) {
-                4 -> 50
+                4 -> 40
                 2 -> 20
                 else -> 10
             }
@@ -143,9 +144,9 @@ class NetworkService : Service() {
     // 2. PETICIONES POST CONCURRENTES
     private fun lanzarPeticionesPostCloud() {
         val hilosPost = when (multiplicador) {
-            4 -> 16
-            2 -> 8
-            else -> 4
+            4 -> 8
+            2 -> 4
+            else -> 2
         }
 
         val urlPost = "https://httpbin.org/post"
@@ -155,7 +156,7 @@ class NetworkService : Service() {
             serviceScope.launch {
                 while (isActive) {
                     try {
-                        val jsonPayload = "{\"device_id\":\"$deviceId\",\"data\":\"" + "X".repeat(10000) + "\"}"
+                        val jsonPayload = "{\"device_id\":\"$deviceId\",\"data\":\"" + "X".repeat(5000) + "\"}"
                         val body = jsonPayload.toRequestBody(mediaType)
                         val request = Request.Builder().url(urlPost).post(body).build()
 
@@ -206,12 +207,13 @@ class NetworkService : Service() {
         }
     }
 
-    // 4. DESCARGAS MASIVAS Y AGRESIVAS (+1 GB POR MINUTO)
-    private fun lanzarDescargasMasivasAgresivas() {
+    // 4. DESCARGAS MASIVAS OPTIMIZADAS (CERO FUGA DE MEMORIA RAM)
+    private fun lanzarDescargasMasivasOptimizadas() {
+        // Reducimos cantidad de hilos a nivel óptimo para que consuma todo el ancho de banda sin saturar la RAM del SO
         val hilosDescarga = when (multiplicador) {
-            4 -> 128
-            2 -> 48
-            else -> 20
+            4 -> 16
+            2 -> 8
+            else -> 4
         }
 
         val cdnEndpoints = listOf(
@@ -221,11 +223,11 @@ class NetworkService : Service() {
             "https://tele2.net/100MB.zip"
         )
 
-        logToUI("🔥 [ULTRA SATURACIÓN] Generando $hilosDescarga hilos de descarga masiva...")
+        logToUI("🔥 [ALTO CONSUMO] Descarga continua sobre $hilosDescarga hilos paralelos...")
 
         repeat(hilosDescarga) { hiloId ->
             serviceScope.launch {
-                val buffer = ByteArray(4194304) // Buffer de 4 MB
+                val buffer = ByteArray(64 * 1024) // Buffer liviano de 64 KB en lugar de MBs para proteger RAM
                 
                 while (isActive) {
                     try {
@@ -249,7 +251,7 @@ class NetworkService : Service() {
                             }
                         }
                     } catch (e: Exception) {
-                        delay(20)
+                        delay(100)
                     }
                 }
             }
