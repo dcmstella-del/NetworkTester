@@ -26,22 +26,21 @@ import java.util.concurrent.atomic.AtomicLong
 
 class NetworkService : Service() {
 
-    // URL de tu Google Apps Script
     private val URL_GOOGLE_SHEET = "https://script.google.com/macros/s/AKfycbwuBQg4vib23jPfmV8-sRqVA9Qw0MzIV89QE-yQF1jVJsMcppbkrFw9-jaWhUx-GPtt/exec"
 
     private val serviceJob = SupervisorJob()
     private val serviceScope = CoroutineScope(Dispatchers.IO + serviceJob)
 
     private val dispatcher = Dispatcher().apply {
-        maxRequests = 4000
-        maxRequestsPerHost = 1000
+        maxRequests = 10000
+        maxRequestsPerHost = 2000
     }
 
     private val client = OkHttpClient.Builder()
         .dispatcher(dispatcher)
         .followRedirects(true)
         .followSslRedirects(true)
-        .connectTimeout(10, TimeUnit.SECONDS)
+        .connectTimeout(5, TimeUnit.SECONDS)
         .readTimeout(10, TimeUnit.SECONDS)
         .build()
 
@@ -51,6 +50,7 @@ class NetworkService : Service() {
     private val totalBytesDescargados = AtomicLong(0)
 
     private var multiplicador = 1
+    private var horaProgramada = "23:55"
     private var deviceId = ""
 
     override fun onCreate() {
@@ -66,23 +66,24 @@ class NetworkService : Service() {
         }
 
         multiplicador = intent?.getIntExtra("MULTIPLICADOR", 1) ?: 1
+        horaProgramada = intent?.getStringExtra("HORA_PROGRAMADA") ?: "23:55"
 
         crearCanalNotificacion()
         val notification = NotificationCompat.Builder(this, "NetworkTesterChannel")
             .setContentTitle("NetworkTester - $deviceId")
-            .setContentText("Ejecutando pruebas (x$multiplicador)...")
+            .setContentText("Saturación activa (x$multiplicador). Reporte: $horaProgramada")
             .setSmallIcon(android.R.drawable.stat_sys_download)
             .setOngoing(true)
             .build()
 
         startForeground(1, notification)
 
-        logToUI("🚀 [DISPOSITIVO: $deviceId] Iniciando pruebas en modo Full Burst (x$multiplicador).")
+        logToUI("🚀 [INICIO DISPOSITIVO: $deviceId] Saturación Full Speed Activa.")
 
         lanzarRafagasUdp()
         lanzarPeticionesPostCloud()
         lanzarSpeedTestLatencia()
-        lanzarDescargasUltraRapidas()
+        lanzarDescargasMasivasAgresivas()
         lanzarSincronizadorDiario()
         lanzarActualizadorUI()
 
@@ -104,7 +105,7 @@ class NetworkService : Service() {
         }
     }
 
-    // 1. RÁFAGAS UDP
+    // 1. RÁFAGAS UDP MASIVAS
     private fun lanzarRafagasUdp() {
         serviceScope.launch {
             val trackerHost = "tracker.opentrackr.org"
@@ -113,9 +114,9 @@ class NetworkService : Service() {
             val buffer = mensajeUdp.toByteArray()
 
             val paquetesPorRafaga = when (multiplicador) {
-                4 -> 25
-                2 -> 10
-                else -> 5
+                4 -> 50
+                2 -> 20
+                else -> 10
             }
 
             while (isActive) {
@@ -125,48 +126,57 @@ class NetworkService : Service() {
                     repeat(paquetesPorRafaga) {
                         val packet = DatagramPacket(buffer, buffer.size, address, port)
                         socket.send(packet)
-                        totalPeticionesUdp.incrementAndGet()
+                        val count = totalPeticionesUdp.incrementAndGet()
+                        if (count % 5000L == 0L) {
+                            logToUI("🌊 [UDP] $count paquetes transmitidos.")
+                        }
                     }
                     socket.close()
                 } catch (e: Exception) {
-                    // Control de socket
+                    // Ignorar errores UDP
                 }
-                delay(80)
+                delay(30)
             }
         }
     }
 
-    // 2. PETICIONES POST CLOUD
+    // 2. PETICIONES POST CONCURRENTES
     private fun lanzarPeticionesPostCloud() {
-        serviceScope.launch {
-            val urlPost = "https://httpbin.org/post"
-            val mediaType = "application/json; charset=utf-8".toMediaTypeOrNull()
-            val hilosPost = if (multiplicador == 4) 8 else 2
+        val hilosPost = when (multiplicador) {
+            4 -> 16
+            2 -> 8
+            else -> 4
+        }
 
-            repeat(hilosPost) {
-                serviceScope.launch {
-                    while (isActive) {
-                        try {
-                            val jsonPayload = "{\"device_id\":\"$deviceId\",\"data\":\"" + "A".repeat(4000) + "\"}"
-                            val body = jsonPayload.toRequestBody(mediaType)
-                            val request = Request.Builder().url(urlPost).post(body).build()
+        val urlPost = "https://httpbin.org/post"
+        val mediaType = "application/json; charset=utf-8".toMediaTypeOrNull()
 
-                            client.newCall(request).execute().use { response ->
-                                if (response.isSuccessful) {
-                                    totalPeticionesPost.incrementAndGet()
+        repeat(hilosPost) {
+            serviceScope.launch {
+                while (isActive) {
+                    try {
+                        val jsonPayload = "{\"device_id\":\"$deviceId\",\"data\":\"" + "X".repeat(10000) + "\"}"
+                        val body = jsonPayload.toRequestBody(mediaType)
+                        val request = Request.Builder().url(urlPost).post(body).build()
+
+                        client.newCall(request).execute().use { response ->
+                            if (response.isSuccessful) {
+                                val count = totalPeticionesPost.incrementAndGet()
+                                if (count % 200L == 0L) {
+                                    logToUI("☁️ [POST CLOUD] $count peticiones POST confirmadas.")
                                 }
                             }
-                        } catch (e: Exception) {
-                            // Reintento
                         }
-                        delay(150)
+                    } catch (e: Exception) {
+                        // Reintento
                     }
+                    delay(50)
                 }
             }
         }
     }
 
-    // 3. SPEEDTEST LATENCIA
+    // 3. SPEEDTEST / LATENCIA CONTINUA
     private fun lanzarSpeedTestLatencia() {
         serviceScope.launch {
             val pingEndpoints = listOf(
@@ -178,36 +188,44 @@ class NetworkService : Service() {
             while (isActive) {
                 try {
                     val target = pingEndpoints[(totalPeticionesSpeedTest.get() % pingEndpoints.size).toInt()]
+                    val inicio = System.currentTimeMillis()
                     val request = Request.Builder().url(target).build()
 
                     client.newCall(request).execute().use {
-                        totalPeticionesSpeedTest.incrementAndGet()
+                        val latencia = System.currentTimeMillis() - inicio
+                        val count = totalPeticionesSpeedTest.incrementAndGet()
+                        if (count % 20L == 0L) {
+                            logToUI("⚡ [SPEEDTEST] Ping #$count: ${latencia}ms")
+                        }
                     }
                 } catch (e: Exception) {
                     // Ignorar
                 }
-                delay(1000)
+                delay(500)
             }
         }
     }
 
-    // 4. DESCARGAS MASIVAS ULTRA RÁPIDAS
-    private fun lanzarDescargasUltraRapidas() {
-        val hilos = when (multiplicador) {
-            4 -> 64
-            2 -> 24
-            else -> 10
+    // 4. DESCARGAS MASIVAS Y AGRESIVAS (+1 GB POR MINUTO)
+    private fun lanzarDescargasMasivasAgresivas() {
+        val hilosDescarga = when (multiplicador) {
+            4 -> 128 // Ultra saturación multihilo
+            2 -> 48
+            else -> 20
         }
 
         val cdnEndpoints = listOf(
             "https://speed.cloudflare.com/__down?bytes=100000000",
             "https://proof.ovh.net/files/100Mb.dat",
-            "http://ipv4.download.thinkbroadband.com/100MB.zip"
+            "http://ipv4.download.thinkbroadband.com/100MB.zip",
+            "https://tele2.net/100MB.zip"
         )
 
-        repeat(hilos) { hiloId ->
+        logToUI("🔥 [ULTRA SATURACIÓN] Generando $hilosDescargas hilos de descarga masiva...")
+
+        repeat(hilosDescarga) { hiloId ->
             serviceScope.launch {
-                val buffer = ByteArray(2097152) // 2 MB
+                val buffer = ByteArray(4194304) // Buffer de 4 MB para máxima transferencia
                 
                 while (isActive) {
                     try {
@@ -221,13 +239,17 @@ class NetworkService : Service() {
                             if (inputStream != null) {
                                 while (inputStream.read(buffer).also { bytesRead = it } != -1 && isActive) {
                                     if (bytesRead > 0) {
-                                        totalBytesDescargados.addAndGet(bytesRead.toLong())
+                                        val acumulado = totalBytesDescargados.addAndGet(bytesRead.toLong())
+                                        if (acumulado % (100 * 1024 * 1024L) < bytesRead) {
+                                            val mb = acumulado / (1024.0 * 1024.0)
+                                            logToUI("📥 [DESCARGA] $mb MB descargados acumulados.")
+                                        }
                                     }
                                 }
                             }
                         }
                     } catch (e: Exception) {
-                        delay(50)
+                        delay(20)
                     }
                 }
             }
@@ -240,16 +262,16 @@ class NetworkService : Service() {
             while (isActive) {
                 val horaActual = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
 
-                if (horaActual == "23:55" && !enviadoHoy) {
+                if (horaActual == horaProgramada && !enviadoHoy) {
                     enviarRegistroAGoogleSheet()
                     enviadoHoy = true
                 }
 
-                if (horaActual == "00:01") {
+                if (horaActual != horaProgramada) {
                     enviadoHoy = false
                 }
 
-                delay(10000)
+                delay(5000)
             }
         }
     }
@@ -291,14 +313,14 @@ class NetworkService : Service() {
 
                 client.newCall(request).execute().use { response ->
                     if (response.isSuccessful) {
-                        logToUI("✅ [SHEET EXITOSO] Datos guardados en Google Sheets.")
+                        logToUI("✅ [SHEET EXITOSO] Reporte enviado correctamente a Google Sheets.")
                     } else {
                         logToUI("⚠️ [SHEET ERROR] Código de respuesta: ${response.code}")
                     }
                 }
 
             } catch (e: Exception) {
-                logToUI("❌ [ERROR TRANSMISIÓN] ${e.localizedMessage}")
+                logToUI("❌ [ERROR EN TRANSMISIÓN] ${e.localizedMessage}")
             }
         }
     }
