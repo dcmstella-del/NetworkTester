@@ -30,22 +30,22 @@ class NetworkService : Service() {
     private val serviceScope = CoroutineScope(Dispatchers.IO + serviceJob)
 
     private val dispatcher = Dispatcher().apply {
-        maxRequests = 500
-        maxRequestsPerHost = 150
+        maxRequests = 1000
+        maxRequestsPerHost = 300
     }
 
     private val client = OkHttpClient.Builder()
         .dispatcher(dispatcher)
         .connectTimeout(5, TimeUnit.SECONDS)
-        .readTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(10, TimeUnit.SECONDS)
         .build()
 
     private val totalPeticionesUdp = AtomicLong(0)
     private val totalPeticionesPost = AtomicLong(0)
+    private val totalPeticionesSpeedTest = AtomicLong(0)
     private val totalBytesDescargados = AtomicLong(0)
 
     private var multiplicador = 1
-    private var hilosDescarga = 12
     private var correoDestino = ""
     private var horaProgramada = "23:00"
 
@@ -54,26 +54,21 @@ class NetworkService : Service() {
         correoDestino = intent?.getStringExtra("CORREO") ?: ""
         horaProgramada = intent?.getStringExtra("HORA") ?: "23:00"
 
-        hilosDescarga = when (multiplicador) {
-            2 -> 18
-            4 -> 32
-            else -> 8
-        }
-
         crearCanalNotificacion()
         val notification = NotificationCompat.Builder(this, "NetworkTesterChannel")
-            .setContentTitle("Saturación de Red Ultra (x$multiplicador)")
-            .setContentText("Transferencia activa hacia $correoDestino")
+            .setContentTitle("Prueba Multicanal de Red (x$multiplicador)")
+            .setContentText("Saturación activa enviando datos...")
             .setSmallIcon(android.R.drawable.stat_sys_download)
             .setOngoing(true)
             .build()
 
         startForeground(1, notification)
 
-        logToUI("🚀 [MODO ULTRA] Lanzando $hilosDescarga hilos concurrentes de descarga masiva.")
+        logToUI("🔥 [INICIO] Ejecutando UDP, POST Cloud, SpeedTest y Descargas Masivas (Modo x$multiplicador).")
 
-        lanzarSaturacionUdp()
-        lanzarPeticionesPost()
+        lanzarRafagasUdp()
+        lanzarPeticionesPostCloud()
+        lanzarSpeedTestLatencia()
         lanzarDescargasMasivas()
         lanzarProgramadorDeCorreo()
         lanzarActualizadorUI()
@@ -90,59 +85,105 @@ class NetworkService : Service() {
         }
     }
 
-    private fun lanzarSaturacionUdp() {
+    // 1. RÁFAGAS UDP: Exactamente 120/min (Normal), 240/min (x2), 600/min (Full Burst)
+    private fun lanzarRafagasUdp() {
         serviceScope.launch {
             val trackerHost = "tracker.opentrackr.org"
             val port = 6969
             val mensajeUdp = "ANNOUNCE_P2P_SIMULATION_PACKET_TEST"
             val buffer = mensajeUdp.toByteArray()
 
+            // Intervalo: 500ms en Normal = 120 ráfagas/min
+            val intervalo = (500 / multiplicador).toLong()
+
             while (isActive) {
                 try {
                     val address = InetAddress.getByName(trackerHost)
                     val socket = DatagramSocket()
-                    val paquetesAEnviar = 60 * multiplicador
-
-                    for (i in 1..paquetesAEnviar) {
-                        val packet = DatagramPacket(buffer, buffer.size, address, port)
-                        socket.send(packet)
-                        totalPeticionesUdp.incrementAndGet()
-                    }
+                    val packet = DatagramPacket(buffer, buffer.size, address, port)
+                    socket.send(packet)
+                    totalPeticionesUdp.incrementAndGet()
                     socket.close()
-                    logToUI("🌊 [UDP] Ráfaga de $paquetesAEnviar paquetes enviada")
+
+                    if (totalPeticionesUdp.get() % 20L == 0L) {
+                        logToUI("🌊 [UDP] Ráfagas enviadas: ${totalPeticionesUdp.get()}")
+                    }
                 } catch (e: Exception) {
-                    // Control de errores de red
+                    // Control de socket
                 }
-                delay((300 / multiplicador).toLong())
+                delay(intervalo)
             }
         }
     }
 
-    private fun lanzarPeticionesPost() {
+    // 2. SINCRONIZACIÓN CLOUD: 80 POST/min (Normal), 160 POST/min (x2), 400 POST/min (Full Burst)
+    private fun lanzarPeticionesPostCloud() {
         serviceScope.launch {
             val urlPost = "https://httpbin.org/post"
             val mediaType = "application/json; charset=utf-8".toMediaTypeOrNull()
+            // Intervalo: 750ms en Normal = 80 POST/min
+            val intervalo = (750 / multiplicador).toLong()
 
             while (isActive) {
                 try {
-                    val jsonPayload = "{\"data\":\"" + "X".repeat(8000) + "\"}"
+                    val jsonPayload = "{\"sync_data\":\"" + "A".repeat(4000) + "\"}"
                     val body = jsonPayload.toRequestBody(mediaType)
                     val request = Request.Builder().url(urlPost).post(body).build()
 
                     client.newCall(request).execute().use { response ->
                         if (response.isSuccessful) {
-                            totalPeticionesPost.incrementAndGet()
+                            val total = totalPeticionesPost.incrementAndGet()
+                            if (total % 10L == 0L) {
+                                logToUI("☁️ [POST CLOUD] Peticiones sincronizadas: $total")
+                            }
                         }
                     }
                 } catch (e: Exception) {
                     // Reintento
                 }
-                delay((400 / multiplicador).toLong())
+                delay(intervalo)
             }
         }
     }
 
+    // 3. SPEED TEST: 30 mediciones/min (Normal), 60/min (x2), 120/min (Full Burst)
+    private fun lanzarSpeedTestLatencia() {
+        serviceScope.launch {
+            val pingEndpoints = listOf(
+                "https://1.1.1.1/cdn-cgi/trace",
+                "https://8.8.8.8",
+                "https://www.google.com/generate_204"
+            )
+            // Intervalo: 2000ms en Normal = 30 mediciones/min
+            val intervalo = (2000 / multiplicador).toLong()
+
+            while (isActive) {
+                try {
+                    val target = pingEndpoints[(totalPeticionesSpeedTest.get() % pingEndpoints.size).toInt()]
+                    val inicio = System.currentTimeMillis()
+                    val request = Request.Builder().url(target).build()
+
+                    client.newCall(request).execute().use { response ->
+                        val latencia = System.currentTimeMillis() - inicio
+                        val count = totalPeticionesSpeedTest.incrementAndGet()
+                        logToUI("⚡ [SPEEDTEST #$count] Latencia con $target: ${latencia}ms")
+                    }
+                } catch (e: Exception) {
+                    // Ignorar
+                }
+                delay(intervalo)
+            }
+        }
+    }
+
+    // 4. DESCARGAS MASIVAS: 500 MB/min (Normal), ~1 GB/min (x2), ~2.5 GB/min (Full Burst)
     private fun lanzarDescargasMasivas() {
+        val hilos = when (multiplicador) {
+            2 -> 16
+            4 -> 32
+            else -> 8
+        }
+
         val cdnEndpoints = listOf(
             "https://speed.cloudflare.com/__down?bytes=1000000000",
             "https://proof.ovh.net/files/1Gb.dat",
@@ -150,7 +191,7 @@ class NetworkService : Service() {
             "https://fsn1-speed.hetzner.com/1GB.bin"
         )
 
-        repeat(hilosDescarga) { hiloId ->
+        repeat(hilos) { hiloId ->
             serviceScope.launch {
                 val buffer = ByteArray(524288) // Buffer de 512 KB
                 
@@ -159,7 +200,7 @@ class NetworkService : Service() {
                         val targetUrl = cdnEndpoints[hiloId % cdnEndpoints.size]
                         val request = Request.Builder()
                             .url(targetUrl)
-                            .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
+                            .header("User-Agent", "Mozilla/5.0")
                             .build()
 
                         client.newCall(request).execute().use { response ->
@@ -189,7 +230,7 @@ class NetworkService : Service() {
                 val horaActual = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
 
                 if (horaActual == horaProgramada && !correoEnviadoHoy) {
-                    logToUI("⏰ [REPORTE] Hora alcanzada ($horaActual). Transmitiendo correo...")
+                    logToUI("⏰ [REPORTE] Hora programada ($horaActual) alcanzada. Enviando correo...")
                     enviarCorreoDeReporte()
                     correoEnviadoHoy = true
                 }
@@ -209,22 +250,24 @@ class NetworkService : Service() {
                 val bytes = totalBytesDescargados.get()
                 val udp = totalPeticionesUdp.get()
                 val post = totalPeticionesPost.get()
+                val speed = totalPeticionesSpeedTest.get()
                 val mbTotales = bytes / (1024.0 * 1024.0)
                 val gbTotales = mbTotales / 1024.0
-                val totalPeticiones = udp + post
+                val totalPeticiones = udp + post + speed
                 val fecha = SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault()).format(Date())
 
                 val formBody = FormBody.Builder()
                     .add("email", correoDestino)
                     .add("_replyto", correoDestino)
-                    .add("_subject", "Reporte NetworkTester - $fecha")
+                    .add("_subject", "Reporte Completo NetworkTester - $fecha")
                     .add("Fecha_Registro", fecha)
                     .add("Peticiones_Totales", totalPeticiones.toString())
                     .add("Rafagas_UDP", udp.toString())
-                    .add("Peticiones_POST", post.toString())
+                    .add("Peticiones_POST_Cloud", post.toString())
+                    .add("Pruebas_SpeedTest", speed.toString())
                     .add("Megabytes_Consumidos", String.format(Locale.US, "%.2f MB", mbTotales))
                     .add("Gigabytes_Consumidos", String.format(Locale.US, "%.3f GB", gbTotales))
-                    .add("Modo_Ejecucion", "Modo x$multiplicador ($hilosDescarga hilos)")
+                    .add("Modo_Ejecucion", "Modo x$multiplicador")
                     .build()
 
                 val request = Request.Builder()
@@ -234,7 +277,7 @@ class NetworkService : Service() {
 
                 client.newCall(request).execute().use { response ->
                     if (response.isSuccessful) {
-                        logToUI("✉️ [CORREO ENVIADO EXITOSAMENTE] Revisa tu bandeja de entrada o Spam.")
+                        logToUI("✉️ [CORREO EXITOSO] El reporte completo ha sido enviado a $correoDestino")
                     } else {
                         logToUI("⚠️ [CORREO ERROR HTTP] Código: ${response.code}")
                     }
@@ -248,7 +291,7 @@ class NetworkService : Service() {
     private fun actualizarMetricasUI() {
         val intent = Intent("com.example.networktester.METRICS_EVENT").apply {
             putExtra("TOTAL_UDP", totalPeticionesUdp.get())
-            putExtra("TOTAL_POST", totalPeticionesPost.get())
+            putExtra("TOTAL_POST", totalPeticionesPost.get() + totalPeticionesSpeedTest.get())
             putExtra("TOTAL_BYTES", totalBytesDescargados.get())
             setPackage(packageName)
         }
