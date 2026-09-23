@@ -69,7 +69,6 @@ class MainActivity : AppCompatActivity() {
 
         tvConsole.movementMethod = ScrollingMovementMethod()
 
-        // Hora predeterminada 23:55
         etHoraReporte.setText("23:55")
 
         btnIniciar.setOnClickListener {
@@ -92,7 +91,7 @@ class MainActivity : AppCompatActivity() {
                 startService(serviceIntent)
             }
 
-            Toast.makeText(this, "Pruebas iniciadas. Reporte diario a las $horaProgramada", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Pruebas iniciadas. Reporte programado a las $horaProgramada", Toast.LENGTH_SHORT).show()
         }
 
         btnEnviarAhora.setOnClickListener {
@@ -111,9 +110,13 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.33) Context.RECEIVER_NOT_EXPORTED else 0
-        registerReceiver(metricsReceiver, IntentFilter("com.example.networktester.METRICS_EVENT"), flags)
-        registerReceiver(logReceiver, IntentFilter("com.example.networktester.LOG_EVENT"), flags)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(metricsReceiver, IntentFilter("com.example.networktester.METRICS_EVENT"), Context.RECEIVER_NOT_EXPORTED)
+            registerReceiver(logReceiver, IntentFilter("com.example.networktester.LOG_EVENT"), Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(metricsReceiver, IntentFilter("com.example.networktester.METRICS_EVENT"))
+            registerReceiver(logReceiver, IntentFilter("com.example.networktester.LOG_EVENT"))
+        }
     }
 
     override fun onPause() {
