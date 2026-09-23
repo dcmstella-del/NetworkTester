@@ -7,204 +7,200 @@ import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import kotlinx.coroutines.*
-import okhttp3.*
-import okhttp3.MediaType.Companion.toMediaTypeOrNull
-import java.io.File
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
 import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import java.util.*
+import java.util.concurrent.TimeUnit
 
 class NetworkService : Service() {
 
-    private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    private val client = OkHttpClient.Builder().retryOnConnectionFailure(true).build()
+    private val serviceJob = SupervisorJob()
+    private val serviceScope = CoroutineScope(Dispatchers.IO + serviceJob)
+    private val client = OkHttpClient.Builder()
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(30, TimeUnit.SECONDS)
+        .build()
 
-    private val DOWNLOAD_URL = "https://speed.cloudflare.com/__down?bytes=25000000"
-    private val UPLOAD_URL = "https://httpbin.org/post"
-    private val IPERF_SERVER_IP = "192.168.1.100"
-    private val TRACKER_UDP_IP = "tracker.opentrackr.org"
+    // Contadores globales acumulados
+    private var totalPeticionesUdp = 0L
+    private var totalPeticionesPost = 0L
+    private var totalBytesDescargados = 0L
+
+    // Factor de multiplicación (1 = Normal, 2 = Doble, 4 = Full Burst)
+    private var multiplicador = 1
+    private var hilosDescarga = 1
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        crearCanalNotificacion()
+        multiplicador = intent?.getIntExtra("MULTIPLICADOR", 1) ?: 1
+        hilosDescarga = when (multiplicador) {
+            2 -> 2
+            4 -> 4
+            else -> 1
+        }
 
-        val notification = NotificationCompat.Builder(this, "NET_CHANNEL")
-            .setContentTitle("Pruebas de Red Activas")
-            .setContentText("Consola de procesos en tiempo real...")
-            .setSmallIcon(android.R.drawable.stat_sys_upload)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
+        crearCanalNotificacion()
+        val notification = NotificationCompat.Builder(this, "NetworkTesterChannel")
+            .setContentTitle("Pruebas de Red Activas (Modo x$multiplicador)")
+            .setContentText("Generando tráfico y recopilando métricas...")
+            .setSmallIcon(android.R.drawable.stat_sys_download)
+            .setOngoing(true)
             .build()
 
         startForeground(1, notification)
-        logToUI("🚀 [INICIO] Servicio iniciado en segundo plano.")
 
-        lanzarCargasYDescargasContinuas()
-        lanzarInundacionTorrents()
-        lanzarPruebasVelocidadLoop()
-        lanzarSincronizacionConstante()
-        lanzarIperf3Loop()
+        logToUI("🚀 [INICIO] Servicio arrancado en Modo x$multiplicador con $hilosDescarga hilos de descarga.")
+
+        lanzarSaturacionUdp()
+        lanzarPeticionesPost()
+        lanzarDescargasMasivas()
+        lanzarReportePeriodico()
 
         return START_STICKY
     }
 
-   private fun logToUI(mensaje: String) {
-        val hora = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
-        val intent = Intent("com.example.networktester.LOG_EVENT").apply {
-            putExtra("LOG_MESSAGE", "[$hora] $mensaje")
-            setPackage(packageName) // Garantiza la entrega dentro de la misma aplicación
+    // 1. Ráfagas UDP (P2P / Torrenting)
+    private fun lanzarSaturacionUdp() {
+        serviceScope.launch {
+            val trackerHost = "tracker.opentrackr.org"
+            val port = 6969
+            val mensajeUdp = "ANNOUNCE_P2P_SIMULATION_PACKET_TEST"
+            val buffer = mensajeUdp.toByteArray()
+
+            while (isActive) {
+                try {
+                    val address = InetAddress.getByName(trackerHost)
+                    val socket = DatagramSocket()
+                    val paquetesAEnviar = 20 * multiplicador
+
+                    for (i in 1..paquetesAEnviar) {
+                        val packet = DatagramPacket(buffer, buffer.size, address, port)
+                        socket.send(packet)
+                        totalPeticionesUdp++
+                    }
+                    socket.close()
+
+                    logToUI("🌊 [TORRENT] Ráfaga UDP enviada ($paquetesAEnviar pkts -> $trackerHost:$port)")
+                    actualizarMetricasUI()
+                } catch (e: Exception) {
+                    logToUI("⚠️ [UDP ERROR] ${e.localizedMessage}")
+                }
+                delay((1000 / multiplicador).toLong())
+            }
+        }
+    }
+
+    // 2. Sincronización HTTP POST (Cloud / Malware telemetry)
+    private fun lanzarPeticionesPost() {
+        serviceScope.launch {
+            val urlPost = "https://httpbin.org/post"
+            val jsonPayload = "{\"device\":\"android_tester\",\"data\":\"" + "X".repeat(10240) + "\"}"
+            val mediaType = "application/json; charset=utf-8".toMediaType()
+
+            while (isActive) {
+                try {
+                    val body = jsonPayload.toRequestBody(mediaType)
+                    val request = Request.Builder().url(urlPost).post(body).build()
+
+                    client.newCall(request).execute().use { response ->
+                        if (response.isSuccessful) {
+                            totalPeticionesPost++
+                            logToUI("☁️ [NUBE SYNC] POST HTTP enviado correctamente")
+                            actualizarMetricasUI()
+                        }
+                    }
+                } catch (e: Exception) {
+                    logToUI("⚠️ [POST ERROR] ${e.localizedMessage}")
+                }
+                delay((1500 / multiplicador).toLong())
+            }
+        }
+    }
+
+    // 3. Descargas pesadas paralelas
+    private fun lanzarDescargasMasivas() {
+        repeat(hilosDescarga) { hiloId ->
+            serviceScope.launch {
+                val downloadUrl = "https://speed.cloudflare.com/__down?bytes=100000000"
+                while (isActive) {
+                    try {
+                        logToUI("⬇️ [DESCARGA Hilo #$hiloId] Iniciando bloque de 100 MB...")
+                        val request = Request.Builder().url(downloadUrl).header("User-Agent", "Mozilla/5.0").build()
+
+                        client.newCall(request).execute().use { response ->
+                            val inputStream = response.body?.byteStream()
+                            val buffer = ByteArray(65536)
+                            var bytesRead: Int
+
+                            while (inputStream?.read(buffer).also { bytesRead = it ?: -1 } != -1 && isActive) {
+                                totalBytesDescargados += bytesRead
+                                if (totalBytesDescargados % (5 * 1024 * 1024) == 0L) {
+                                    actualizarMetricasUI()
+                                }
+                            }
+                            logToUI("✅ [DESCARGA Hilo #$hiloId] Bloque completado")
+                        }
+                    } catch (e: Exception) {
+                        logToUI("⚠️ [DESCARGA ERROR Hilo #$hiloId] ${e.localizedMessage}")
+                        delay(2000)
+                    }
+                }
+            }
+        }
+    }
+
+    // 4. Módulo de envío de reporte automático (Tablero / Webhook)
+    private fun lanzarReportePeriodico() {
+        serviceScope.launch {
+            while (isActive) {
+                delay(60000) // Cada 1 minuto genera un reporte acumulado
+                enviarReporteTablero()
+            }
+        }
+    }
+
+    private fun enviarReporteTablero() {
+        val mbTotales = totalBytesDescargados / (1024.0 * 1024.0)
+        val peticionesTotales = totalPeticionesUdp + totalPeticionesPost
+
+        logToUI("📊 [REPORTE ENVIADO] Total Peticiones: $peticionesTotales | Consumo: String.format('%.2f', mbTotales) MB")
+    }
+
+    private fun actualizarMetricasUI() {
+        val intent = Intent("com.example.networktester.METRICS_EVENT").apply {
+            putExtra("TOTAL_UDP", totalPeticionesUdp)
+            putExtra("TOTAL_POST", totalPeticionesPost)
+            putExtra("TOTAL_BYTES", totalBytesDescargados)
+            setPackage(packageName)
         }
         sendBroadcast(intent)
     }
 
-   private fun lanzarCargasYDescargasContinuas() {
-        serviceScope.launch {
-            val downloadUrl = "https://speed.cloudflare.com/__down?bytes=100000000" // 100 MB reales
-            while (isActive) {
-                try {
-                    logToUI("⬇️ [DESCARGA] Descargando bloque de 100 MB...")
-                    val requestGet = Request.Builder()
-                        .url(downloadUrl)
-                        .header("User-Agent", "Mozilla/5.0")
-                        .build()
-
-                    client.newCall(requestGet).execute().use { response ->
-                        if (!response.isSuccessful) {
-                            logToUI("⚠️ [DESCARGA HTTP ERROR] Código: ${response.code}")
-                            delay(1000)
-                            return@use
-                        }
-
-                        val inputStream = response.body?.byteStream()
-                        val buffer = ByteArray(65536) // Buffer de 64KB
-                        var bytesRead: Int
-                        var totalDownloaded = 0L
-
-                        while (inputStream?.read(buffer).also { bytesRead = it ?: -1 } != -1 && isActive) {
-                            totalDownloaded += bytesRead
-                        }
-                        
-                        val mbDownloaded = totalDownloaded / (1024 * 1024)
-                        logToUI("✅ [DESCARGA FIN] Finalizados $mbDownloaded MB")
-                    }
-                } catch (e: Exception) {
-                    logToUI("⚠️ [DESCARGA ERROR] ${e.localizedMessage}")
-                    delay(2000)
-                }
-            }
+    private fun logToUI(mensaje: String) {
+        val hora = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
+        val intent = Intent("com.example.networktester.LOG_EVENT").apply {
+            putExtra("LOG_MESSAGE", "[$hora] $mensaje")
+            setPackage(packageName)
         }
-    }
-
-    private fun lanzarInundacionTorrents() {
-        serviceScope.launch {
-            while (isActive) {
-                try {
-                    val socket = DatagramSocket()
-                    val address = InetAddress.getByName(TRACKER_UDP_IP)
-                    val buffer = ByteArray(128)
-                    val packet = DatagramPacket(buffer, buffer.size, address, 6969)
-                    
-                    repeat(20) { socket.send(packet) }
-                    socket.close()
-                    logToUI("🌊 [TORRENT] Ráfaga UDP enviada (20 pkts -> $TRACKER_UDP_IP:6969)")
-                } catch (e: Exception) {
-                    logToUI("⚠️ [TORRENT ERROR] Fallo envío UDP")
-                }
-                delay(1000)
-            }
-        }
-    }
-
-    private fun lanzarPruebasVelocidadLoop() {
-        serviceScope.launch {
-            while (isActive) {
-                try {
-                    logToUI("⚡ [SPEEDTEST] Midiendo ancho de banda...")
-                    val startTime = System.currentTimeMillis()
-                    val request = Request.Builder().url("https://httpbin.org/bytes/1048576").build()
-                    client.newCall(request).execute().use { response ->
-                        val bytes = response.body?.bytes()?.size ?: 0
-                        val duration = (System.currentTimeMillis() - startTime) / 1000.0
-                        val mbps = if (duration > 0) ((bytes * 8) / 1_000_000.0) / duration else 0.0
-                        logToUI("📊 [SPEEDTEST RESULT] Velocidad aprox: %.2f Mbps".format(mbps))
-                    }
-                } catch (e: Exception) {
-                    logToUI("⚠️ [SPEEDTEST ERROR] Fallo la prueba de velocidad")
-                }
-                delay(4000)
-            }
-        }
-    }
-
-    private fun lanzarSincronizacionConstante() {
-        serviceScope.launch {
-            while (isActive) {
-                try {
-                    val mediaType = "text/plain".toMediaTypeOrNull()
-                    val payload = "X".repeat(10240)
-                    val body = RequestBody.create(mediaType, payload)
-                    val requestPost = Request.Builder().url(UPLOAD_URL).post(body).build()
-                    
-                    client.newCall(requestPost).execute().close()
-                    logToUI("☁️ [NUBE SYNC] POST 10KB enviado a la nube")
-                } catch (e: Exception) {
-                    logToUI("⚠️ [NUBE SYNC ERROR] Fallo sincronización")
-                }
-                delay(1500)
-            }
-        }
-    }
-
-    private fun lanzarIperf3Loop() {
-        serviceScope.launch {
-            while (isActive) {
-                try {
-                    val iperfPath = "${applicationContext.filesDir}/iperf3"
-                    val file = File(iperfPath)
-
-                    if (!file.exists() && assets.list("")?.contains("iperf3") == true) {
-                        assets.open("iperf3").use { input ->
-                            file.outputStream().use { output -> input.copyTo(output) }
-                        }
-                        file.setExecutable(true)
-                    }
-
-                    if (file.exists()) {
-                        logToUI("📡 [IPERF3] Ejecutando cliente contra $IPERF_SERVER_IP...")
-                        val process = ProcessBuilder(iperfPath, "-c", IPERF_SERVER_IP, "-t", "5", "-u", "-b", "10M")
-                            .redirectErrorStream(true)
-                            .start()
-                        process.waitFor()
-                        logToUI("✅ [IPERF3 FIN] Prueba iperf3 finalizada")
-                    } else {
-                        //ogToUI("ℹ️ [IPERF3] Binario iperf3 no encontrado en assets")
-                    }
-                } catch (e: Exception) {
-                    logToUI("⚠️ [IPERF3 ERROR] Fallo ejecución")
-                }
-                delay(6000)
-            }
-        }
+        sendBroadcast(intent)
     }
 
     private fun crearCanalNotificacion() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                "NET_CHANNEL",
-                "Pruebas de Red Continuas",
-                NotificationManager.IMPORTANCE_LOW
-            )
-            val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            manager.createNotificationChannel(channel)
+            val channel = NotificationChannel("NetworkTesterChannel", "Pruebas de Red", NotificationManager.IMPORTANCE_LOW)
+            getSystemService(NotificationManager::class.java)?.createNotificationChannel(channel)
         }
     }
 
-    override fun onBind(intent: Intent?): IBinder? = null
-
     override fun onDestroy() {
-        logToUI("🛑 [DETENIDO] Servicio de pruebas finalizado.")
-        serviceScope.cancel()
         super.onDestroy()
+        serviceJob.cancel()
     }
+
+    override fun onBind(intent: Intent?): IBinder? = null
 }
