@@ -55,7 +55,6 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // Asignación con los IDs reales de tu layout XML
         tvMetrics = findViewById(R.id.tvMetrics)
         rgIntensity = findViewById(R.id.rgIntensity)
         etEmail = findViewById(R.id.etEmail)
