@@ -9,8 +9,10 @@ import androidx.core.app.NotificationCompat
 import kotlinx.coroutines.*
 import okhttp3.Dispatcher
 import okhttp3.FormBody
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.InputStream
 import java.net.DatagramPacket
 import java.net.DatagramSocket
@@ -50,11 +52,11 @@ class NetworkService : Service() {
         correoDestino = intent?.getStringExtra("CORREO") ?: ""
         horaProgramada = intent?.getStringExtra("HORA") ?: "23:00"
 
-        // Escalado masivo para saturación extrema (Full Burst = 32 hilos concurrentes)
+        // Escalado para consumo masivo (Full Burst = 32 hilos concurrentes -> ~1 GB/min)
         hilosDescarga = when (multiplicador) {
-            2 -> 18      // Modo Doble (x2)
-            4 -> 32      // Full Burst (Meta: 1 GB/min)
-            else -> 8    // Normal
+            2 -> 18
+            4 -> 32
+            else -> 8
         }
 
         crearCanalNotificacion()
@@ -108,7 +110,7 @@ class NetworkService : Service() {
                     socket.close()
                     logToUI("🌊 [UDP] Ráfaga de $paquetesAEnviar paquetes enviada")
                 } catch (e: Exception) {
-                    // Ignorar errores puntuales de UDP
+                    // Control silencioso
                 }
                 delay((300 / multiplicador).toLong())
             }
@@ -118,11 +120,12 @@ class NetworkService : Service() {
     private fun lanzarPeticionesPost() {
         serviceScope.launch {
             val urlPost = "https://httpbin.org/post"
-            val mediaType = okhttp3.MediaType.parse("application/json; charset=utf-8")
+            val mediaType = "application/json; charset=utf-8".toMediaTypeOrNull()
 
             while (isActive) {
                 try {
-                    val body = okhttp3.RequestBody.create(mediaType, "{\"data\":\"" + "X".repeat(8000) + "\"}")
+                    val jsonPayload = "{\"data\":\"" + "X".repeat(8000) + "\"}"
+                    val body = jsonPayload.toRequestBody(mediaType)
                     val request = Request.Builder().url(urlPost).post(body).build()
 
                     client.newCall(request).execute().use { response ->
@@ -138,7 +141,6 @@ class NetworkService : Service() {
         }
     }
 
-    // Descarga distribuida multicanal para alcanzar 1 GB por minuto en Full Burst
     private fun lanzarDescargasMasivas() {
         val cdnEndpoints = listOf(
             "https://speed.cloudflare.com/__down?bytes=1000000000",
@@ -149,7 +151,7 @@ class NetworkService : Service() {
 
         repeat(hilosDescarga) { hiloId ->
             serviceScope.launch {
-                val buffer = ByteArray(524288) // Buffer ultra rápido de 512 KB
+                val buffer = ByteArray(524288) // Buffer de 512 KB
                 
                 while (isActive) {
                     try {
@@ -160,7 +162,7 @@ class NetworkService : Service() {
                             .build()
 
                         client.newCall(request).execute().use { response ->
-                            val inputStream: InputStream? = response.body()?.byteStream()
+                            val inputStream: InputStream? = response.body?.byteStream()
                             var bytesRead: Int
 
                             if (inputStream != null) {
@@ -211,14 +213,13 @@ class NetworkService : Service() {
                 val totalPeticiones = udp + post
                 val fecha = SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault()).format(Date())
 
-                // FormBody ajustado con campos estándar de envío directo
                 val formBody = FormBody.Builder()
                     .add("email", correoDestino)
                     .add("_replyto", correoDestino)
                     .add("_subject", "Reporte NetworkTester - $fecha")
                     .add("Fecha_Registro", fecha)
                     .add("Peticiones_Totales", totalPeticiones.toString())
-                    .add("Ráfagas_UDP", udp.toString())
+                    .add("Rafagas_UDP", udp.toString())
                     .add("Peticiones_POST", post.toString())
                     .add("Megabytes_Consumidos", String.format(Locale.US, "%.2f MB", mbTotales))
                     .add("Gigabytes_Consumidos", String.format(Locale.US, "%.3f GB", gbTotales))
