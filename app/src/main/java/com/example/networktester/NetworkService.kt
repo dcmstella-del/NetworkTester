@@ -7,11 +7,13 @@ import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import kotlinx.coroutines.*
+import okhttp3.Dispatcher
 import okhttp3.FormBody
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import java.io.InputStream
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
@@ -24,19 +26,25 @@ class NetworkService : Service() {
 
     private val serviceJob = SupervisorJob()
     private val serviceScope = CoroutineScope(Dispatchers.IO + serviceJob)
-    
+
+    // Configuración de OkHttp liberada sin límites de conexiones concurrentes por host
+    private val dispatcher = Dispatcher().apply {
+        maxRequests = 200
+        maxRequestsPerHost = 100
+    }
+
     private val client = OkHttpClient.Builder()
-        .connectTimeout(5, TimeUnit.SECONDS)
-        .readTimeout(10, TimeUnit.SECONDS)
+        .dispatcher(dispatcher)
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(30, TimeUnit.SECONDS)
         .build()
 
-    // Contadores thread-safe
     private val totalPeticionesUdp = AtomicLong(0)
     private val totalPeticionesPost = AtomicLong(0)
     private val totalBytesDescargados = AtomicLong(0)
 
     private var multiplicador = 1
-    private var hilosDescarga = 4
+    private var hilosDescarga = 8
     private var correoDestino = ""
     private var horaProgramada = "23:00"
 
@@ -45,24 +53,24 @@ class NetworkService : Service() {
         correoDestino = intent?.getStringExtra("CORREO") ?: ""
         horaProgramada = intent?.getStringExtra("HORA") ?: "23:00"
 
-        // El valor base (Normal = 1) ahora equivale al DOBLE de la versión previa (4 hilos)
+        // Escalamos agresivamente la cantidad de hilos para saturar la interfaz de red
         hilosDescarga = when (multiplicador) {
-            2 -> 8      // Modo Doble
-            4 -> 16     // Modo Full Burst
-            else -> 4   // Modo Normal (Doble del original)
+            2 -> 12
+            4 -> 24
+            else -> 8
         }
 
         crearCanalNotificacion()
         val notification = NotificationCompat.Builder(this, "NetworkTesterChannel")
-            .setContentTitle("Pruebas de Red Duplicadas (Modo x$multiplicador)")
-            .setContentText("Generando tráfico intensivo hacia $correoDestino")
+            .setContentTitle("Saturación de Red de Alto Rendimiento")
+            .setContentText("Transferencia en vivo a $correoDestino")
             .setSmallIcon(android.R.drawable.stat_sys_download)
             .setOngoing(true)
             .build()
 
         startForeground(1, notification)
 
-        logToUI("🚀 [INICIO POTENCIADO] Ejecutando con $hilosDescarga hilos paralelos de descarga.")
+        logToUI("🚀 [INICIO POTENCIADO] Ejecutando $hilosDescarga hilos paralelos de descarga.")
 
         lanzarSaturacionUdp()
         lanzarPeticionesPost()
@@ -73,17 +81,16 @@ class NetworkService : Service() {
         return START_STICKY
     }
 
-    // Actualiza la UI de manera continua cada 500 ms
+    // Refresco continuo de la UI cada 300 milisegundos
     private fun lanzarActualizadorUI() {
         serviceScope.launch {
             while (isActive) {
                 actualizarMetricasUI()
-                delay(500)
+                delay(300)
             }
         }
     }
 
-    // 1. Ráfagas UDP (P2P / Torrenting) - Base duplicada a 2,400 pkts/min
     private fun lanzarSaturacionUdp() {
         serviceScope.launch {
             val trackerHost = "tracker.opentrackr.org"
@@ -95,8 +102,7 @@ class NetworkService : Service() {
                 try {
                     val address = InetAddress.getByName(trackerHost)
                     val socket = DatagramSocket()
-                    // 40 paquetes por ráfaga cada 1 segundo = 2,400 UDP/minuto en modo Normal
-                    val paquetesAEnviar = 40 * multiplicador
+                    val paquetesAEnviar = 30 * multiplicador
 
                     for (i in 1..paquetesAEnviar) {
                         val packet = DatagramPacket(buffer, buffer.size, address, port)
@@ -104,21 +110,19 @@ class NetworkService : Service() {
                         totalPeticionesUdp.incrementAndGet()
                     }
                     socket.close()
-
-                    logToUI("🌊 [TORRENT] Ráfaga UDP enviada ($paquetesAEnviar pkts -> $trackerHost:$port)")
+                    logToUI("🌊 [UDP] Ráfaga de $paquetesAEnviar paquetes enviada.")
                 } catch (e: Exception) {
-                    logToUI("⚠️ [UDP ERROR] ${e.localizedMessage}")
+                    // Manejo silencioso de reconexiones
                 }
-                delay((1000 / multiplicador).toLong())
+                delay((500 / multiplicador).toLong())
             }
         }
     }
 
-    // 2. HTTP POST Sync - Base duplicada a 80 req/min
     private fun lanzarPeticionesPost() {
         serviceScope.launch {
             val urlPost = "https://httpbin.org/post"
-            val jsonPayload = "{\"device\":\"android_tester\",\"data\":\"" + "X".repeat(10240) + "\"}"
+            val jsonPayload = "{\"data\":\"" + "X".repeat(5000) + "\"}"
             val mediaType = "application/json; charset=utf-8".toMediaType()
 
             while (isActive) {
@@ -129,49 +133,56 @@ class NetworkService : Service() {
                     client.newCall(request).execute().use { response ->
                         if (response.isSuccessful) {
                             totalPeticionesPost.incrementAndGet()
-                            logToUI("☁️ [NUBE SYNC] POST HTTP de 10 KB enviado")
                         }
                     }
                 } catch (e: Exception) {
-                    logToUI("⚠️ [POST ERROR] ${e.localizedMessage}")
+                    // Retry automático
                 }
-                // Delay base reducido a 750 ms (80 peticiones por minuto)
-                delay((750 / multiplicador).toLong())
+                delay((600 / multiplicador).toLong())
             }
         }
     }
 
-    // 3. Descargas Masivas Continuas (Multi-Hilo)
+    // Descarga masiva paralela usando múltiples servidores CDN para evitar throttling del servidor
     private fun lanzarDescargasMasivas() {
+        val urlsPrueba = listOf(
+            "https://speed.cloudflare.com/__down?bytes=100000000",
+            "https://proof.ovh.net/files/100Mb.dat",
+            "http://ipv4.download.thinkbroadband.com/100MB.zip"
+        )
+
         repeat(hilosDescarga) { hiloId ->
             serviceScope.launch {
-                val downloadUrl = "https://speed.cloudflare.com/__down?bytes=1000000000"
+                val buffer = ByteArray(262144) // Buffer óptimo de 256 KB
                 
                 while (isActive) {
                     try {
+                        val url = urlsPrueba[hiloId % urlsPrueba.size]
                         val request = Request.Builder()
-                            .url(downloadUrl)
-                            .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
+                            .url(url)
+                            .header("User-Agent", "Mozilla/5.0")
                             .build()
 
                         client.newCall(request).execute().use { response ->
-                            val inputStream = response.body?.byteStream()
-                            val buffer = ByteArray(131072) // Buffer de 128 KB
+                            val inputStream: InputStream? = response.body?.byteStream()
                             var bytesRead: Int
 
-                            while (inputStream?.read(buffer).also { bytesRead = it ?: -1 } != -1 && isActive) {
-                                totalBytesDescargados.addAndGet(bytesRead.toLong())
+                            if (inputStream != null) {
+                                while (inputStream.read(buffer).also { bytesRead = it } != -1 && isActive) {
+                                    if (bytesRead > 0) {
+                                        totalBytesDescargados.addAndGet(bytesRead.toLong())
+                                    }
+                                }
                             }
                         }
                     } catch (e: Exception) {
-                        delay(1000)
+                        delay(500)
                     }
                 }
             }
         }
     }
 
-    // 4. Verificación y envío de correo programado
     private fun lanzarProgramadorDeCorreo() {
         serviceScope.launch {
             var correoEnviadoHoy = false
@@ -179,7 +190,7 @@ class NetworkService : Service() {
                 val horaActual = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
 
                 if (horaActual == horaProgramada && !correoEnviadoHoy) {
-                    logToUI("⏰ [REPORTE AUTOMÁTICO] Hora alcanzada ($horaActual). Enviando correo...")
+                    logToUI("⏰ [REPORTE] Hora alcanzada ($horaActual). Enviando correo...")
                     enviarCorreoDeReporte()
                     correoEnviadoHoy = true
                 }
@@ -188,7 +199,7 @@ class NetworkService : Service() {
                     correoEnviadoHoy = false
                 }
 
-                delay(20000)
+                delay(15000)
             }
         }
     }
@@ -222,7 +233,7 @@ class NetworkService : Service() {
                     .build()
 
                 client.newCall(request).execute().use { response ->
-                    logToUI("✉️ [CORREO ENVIADO] Reporte transmitido correctamente a $correoDestino")
+                    logToUI("✉️ [CORREO] Reporte enviado a $correoDestino")
                 }
             } catch (e: Exception) {
                 logToUI("⚠️ [CORREO ERROR] ${e.localizedMessage}")
