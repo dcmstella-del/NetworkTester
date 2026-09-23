@@ -90,13 +90,61 @@
                 android:textColor="#FF5252" />
         </RadioGroup>
 
+        <!-- CONFIGURACIÓN DE CORREO Y REPORTE -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Configuración de Reporte Nocturno:"
+            android:textColor="#FFFFFF"
+            android:textStyle="bold" />
+
+        <EditText
+            android:id="@+id/etEmail"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:background="#2A2A2A"
+            android:hint="Correo destino (ej. ing@empresa.com)"
+            android:padding="10dp"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#888888"
+            android:textSize="13sp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="8dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Hora de envío (HH:MM 24h):"
+                android:textColor="#CCCCCC"
+                android:textSize="12sp" />
+
+            <EditText
+                android:id="@+id/etHoraEnvio"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="#2A2A2A"
+                android:hint="23:00"
+                android:padding="6dp"
+                android:text="23:00"
+                android:textColor="#00FF66"
+                android:textSize="13sp"
+                android:gravity="center"
+                android:layout_marginStart="8dp"/>
+        </LinearLayout>
+
         <!-- BOTONES DE CONTROL -->
         <Button
             android:id="@+id/btnStart"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:text="INICIAR PRUEBAS DE RED" />
+            android:text="INICIAR PRUEBAS Y PROGRAMAR REPORTE" />
 
         <Button
             android:id="@+id/btnStop"
@@ -117,7 +165,7 @@
         <ScrollView
             android:id="@+id/scrollViewLogs"
             android:layout_width="match_parent"
-            android:layout_height="250dp"
+            android:layout_height="220dp"
             android:layout_marginTop="8dp"
             android:background="#000000"
             android:padding="8dp">
