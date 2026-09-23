@@ -7,10 +7,10 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.IBinder
+import android.provider.Settings
 import androidx.core.app.NotificationCompat
 import kotlinx.coroutines.*
 import okhttp3.Dispatcher
-import okhttp3.FormBody
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -30,14 +30,14 @@ class NetworkService : Service() {
     private val serviceScope = CoroutineScope(Dispatchers.IO + serviceJob)
 
     private val dispatcher = Dispatcher().apply {
-        maxRequests = 2000
-        maxRequestsPerHost = 500
+        maxRequests = 4000
+        maxRequestsPerHost = 1000
     }
 
     private val client = OkHttpClient.Builder()
         .dispatcher(dispatcher)
-        .connectTimeout(5, TimeUnit.SECONDS)
-        .readTimeout(10, TimeUnit.SECONDS)
+        .connectTimeout(3, TimeUnit.SECONDS)
+        .readTimeout(5, TimeUnit.SECONDS)
         .build()
 
     private val totalPeticionesUdp = AtomicLong(0)
@@ -46,34 +46,48 @@ class NetworkService : Service() {
     private val totalBytesDescargados = AtomicLong(0)
 
     private var multiplicador = 1
-    private var correoDestino = ""
-    private var horaProgramada = "23:00"
+    private var deviceId = ""
+
+    override fun onCreate() {
+        super.onCreate()
+        deviceId = obtenerOConstruirDeviceId()
+    }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        val accion = intent?.action
+        if (accion == "FORZAR_ENVIAR_METRICAS") {
+            enviarRegistroServidorCentral()
+            return START_STICKY
+        }
+
         multiplicador = intent?.getIntExtra("MULTIPLICADOR", 1) ?: 1
-        correoDestino = intent?.getStringExtra("CORREO") ?: ""
-        horaProgramada = intent?.getStringExtra("HORA") ?: "23:00"
 
         crearCanalNotificacion()
         val notification = NotificationCompat.Builder(this, "NetworkTesterChannel")
-            .setContentTitle("Prueba Ultra Intensiva (x$multiplicador)")
-            .setContentText("Saturación de red activa...")
+            .setContentTitle("NetworkTester - $deviceId")
+            .setContentText("Saturante activo (Modo x$multiplicador)...")
             .setSmallIcon(android.R.drawable.stat_sys_download)
             .setOngoing(true)
             .build()
 
         startForeground(1, notification)
 
-        logToUI("🚀 [FULL BURST ULTRA] Iniciando saturación multicanal modo x$multiplicador.")
+        logToUI("🚀 [ID DISPOSITIVO: $deviceId] Iniciando pruebas Full Burst x$multiplicador.")
 
         lanzarRafagasUdp()
         lanzarPeticionesPostCloud()
         lanzarSpeedTestLatencia()
-        lanzarDescargasMasivasExtremas()
-        lanzarProgramadorDeCorreo()
+        lanzarDescargasUltraRapidas()
+        lanzarSincronizadorDiario()
         lanzarActualizadorUI()
 
         return START_STICKY
+    }
+
+    private fun obtenerOConstruirDeviceId(): String {
+        val androidId = Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID) ?: "UNKNOWN"
+        val modelo = Build.MODEL.replace(" ", "_")
+        return "${modelo}_${androidId.takeLast(6)}"
     }
 
     private fun lanzarActualizadorUI() {
@@ -85,141 +99,115 @@ class NetworkService : Service() {
         }
     }
 
-    // 1. UDP Saturante: 120 (Normal), 300 (x2), 1200 ráfagas/min (Full Burst)
+    // 1. RÁFAGAS UDP
     private fun lanzarRafagasUdp() {
         serviceScope.launch {
             val trackerHost = "tracker.opentrackr.org"
             val port = 6969
-            val mensajeUdp = "ANNOUNCE_P2P_SIMULATION_PACKET_TEST_EXTREME"
+            val mensajeUdp = "ANNOUNCE_P2P_SIMULATION_PACKET_TEST_BURST"
             val buffer = mensajeUdp.toByteArray()
 
-            val intervalo = when (multiplicador) {
-                4 -> 50L   // Full Burst Extreme
-                2 -> 200L  // Double
-                else -> 500L
+            val paquetesPorRafaga = when (multiplicador) {
+                4 -> 25
+                2 -> 10
+                else -> 5
             }
 
             while (isActive) {
                 try {
                     val address = InetAddress.getByName(trackerHost)
                     val socket = DatagramSocket()
-                    val packet = DatagramPacket(buffer, buffer.size, address, port)
-                    
-                    // Envío por bloques para no saturar la CPU
-                    val rafagaTamano = if (multiplicador == 4) 5 else 1
-                    repeat(rafagaTamano) {
+                    repeat(paquetesPorRafaga) {
+                        val packet = DatagramPacket(buffer, buffer.size, address, port)
                         socket.send(packet)
                         totalPeticionesUdp.incrementAndGet()
                     }
                     socket.close()
-
-                    if (totalPeticionesUdp.get() % 500L == 0L) {
-                        logToUI("🌊 [UDP ULTRA] Ráfagas enviadas acumuladas: ${totalPeticionesUdp.get()}")
-                    }
                 } catch (e: Exception) {
-                    // Manejo silencioso de red
+                    // Control de socket
                 }
-                delay(intervalo)
+                delay(80)
             }
         }
     }
 
-    // 2. POST Cloud: Sincronización continua de payloads
+    // 2. PETICIONES POST CLOUD
     private fun lanzarPeticionesPostCloud() {
         serviceScope.launch {
             val urlPost = "https://httpbin.org/post"
             val mediaType = "application/json; charset=utf-8".toMediaTypeOrNull()
+            val hilosPost = if (multiplicador == 4) 8 else 2
 
-            val intervalo = when (multiplicador) {
-                4 -> 150L  // ~400 POST/min
-                2 -> 375L  // ~160 POST/min
-                else -> 750L // ~80 POST/min
-            }
+            repeat(hilosPost) {
+                serviceScope.launch {
+                    while (isActive) {
+                        try {
+                            val jsonPayload = "{\"device_id\":\"$deviceId\",\"data\":\"" + "A".repeat(4000) + "\"}"
+                            val body = jsonPayload.toRequestBody(mediaType)
+                            val request = Request.Builder().url(urlPost).post(body).build()
 
-            while (isActive) {
-                try {
-                    val jsonPayload = "{\"sync_data\":\"" + "X".repeat(10000) + "\"}"
-                    val body = jsonPayload.toRequestBody(mediaType)
-                    val request = Request.Builder().url(urlPost).post(body).build()
-
-                    client.newCall(request).execute().use { response ->
-                        if (response.isSuccessful) {
-                            val total = totalPeticionesPost.incrementAndGet()
-                            if (total % 50L == 0L) {
-                                logToUI("☁️ [POST CLOUD] Confirmadas $total peticiones.")
+                            client.newCall(request).execute().use { response ->
+                                if (response.isSuccessful) {
+                                    totalPeticionesPost.incrementAndGet()
+                                }
                             }
+                        } catch (e: Exception) {
+                            // Reintento
                         }
+                        delay(150)
                     }
-                } catch (e: Exception) {
-                    // Reintento
                 }
-                delay(intervalo)
             }
         }
     }
 
-    // 3. SpeedTest Latencia continua
+    // 3. SPEEDTEST LATENCIA
     private fun lanzarSpeedTestLatencia() {
         serviceScope.launch {
             val pingEndpoints = listOf(
                 "https://1.1.1.1/cdn-cgi/trace",
-                "https://8.8.8.8",
+                "https://www.cloudflare.com/cdn-cgi/trace",
                 "https://www.google.com/generate_204"
             )
-
-            val intervalo = when (multiplicador) {
-                4 -> 500L   // 120/min
-                2 -> 1000L  // 60/min
-                else -> 2000L // 30/min
-            }
 
             while (isActive) {
                 try {
                     val target = pingEndpoints[(totalPeticionesSpeedTest.get() % pingEndpoints.size).toInt()]
-                    val inicio = System.currentTimeMillis()
                     val request = Request.Builder().url(target).build()
 
-                    client.newCall(request).execute().use { response ->
-                        val latencia = System.currentTimeMillis() - inicio
-                        val count = totalPeticionesSpeedTest.incrementAndGet()
-                        if (count % 10L == 0L) {
-                            logToUI("⚡ [SPEEDTEST] Latencia medida: ${latencia}ms ($target)")
-                        }
+                    client.newCall(request).execute().use {
+                        totalPeticionesSpeedTest.incrementAndGet()
                     }
                 } catch (e: Exception) {
                     // Ignorar
                 }
-                delay(intervalo)
+                delay(1000)
             }
         }
     }
 
-    // 4. Descargas Masivas Agresivas: Objetivo de ~2 GB/min en Full Burst
-    private fun lanzarDescargasMasivasExtremas() {
+    // 4. DESCARGAS MASIVAS ULTRA RÁPIDAS
+    private fun lanzarDescargasUltraRapidas() {
         val hilos = when (multiplicador) {
-            4 -> 64 // 64 Hilos concurrentes para exprimir la banda ancha Wi-Fi
+            4 -> 64
             2 -> 24
             else -> 10
         }
 
         val cdnEndpoints = listOf(
-            "https://speed.cloudflare.com/__down?bytes=1000000000",
-            "https://proof.ovh.net/files/1Gb.dat",
-            "http://ipv4.download.thinkbroadband.com/1GB.zip",
-            "https://fsn1-speed.hetzner.com/1GB.bin"
+            "https://speed.cloudflare.com/__down?bytes=100000000",
+            "https://proof.ovh.net/files/100Mb.dat",
+            "http://ipv4.download.thinkbroadband.com/100MB.zip"
         )
 
         repeat(hilos) { hiloId ->
             serviceScope.launch {
-                val buffer = ByteArray(1048576) // Buffer de 1 MB por lectura para máximo throughput
+                val buffer = ByteArray(2097152) // 2 MB
                 
                 while (isActive) {
                     try {
                         val targetUrl = cdnEndpoints[hiloId % cdnEndpoints.size]
-                        val request = Request.Builder()
-                            .url(targetUrl)
-                            .header("User-Agent", "Mozilla/5.0")
-                            .build()
+                        val request = Request.Builder().url(targetUrl).build()
 
                         client.newCall(request).execute().use { response ->
                             val inputStream: InputStream? = response.body?.byteStream()
@@ -234,27 +222,26 @@ class NetworkService : Service() {
                             }
                         }
                     } catch (e: Exception) {
-                        delay(100)
+                        delay(50)
                     }
                 }
             }
         }
     }
 
-    private fun lanzarProgramadorDeCorreo() {
+    private fun lanzarSincronizadorDiario() {
         serviceScope.launch {
-            var correoEnviadoHoy = false
+            var enviadoHoy = false
             while (isActive) {
                 val horaActual = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
 
-                if (horaActual == horaProgramada && !correoEnviadoHoy) {
-                    logToUI("⏰ [REPORTE] Hora programada ($horaActual) alcanzada. Transmitiendo datos...")
-                    enviarCorreoDeReporte()
-                    correoEnviadoHoy = true
+                if (horaActual == "23:55" && !enviadoHoy) {
+                    enviarRegistroServidorCentral()
+                    enviadoHoy = true
                 }
 
                 if (horaActual == "00:01") {
-                    correoEnviadoHoy = false
+                    enviadoHoy = false
                 }
 
                 delay(10000)
@@ -262,55 +249,57 @@ class NetworkService : Service() {
         }
     }
 
-    private fun enviarCorreoDeReporte() {
+    private fun enviarRegistroServidorCentral() {
         serviceScope.launch {
             try {
                 val bytes = totalBytesDescargados.get()
                 val udp = totalPeticionesUdp.get()
                 val post = totalPeticionesPost.get()
                 val speed = totalPeticionesSpeedTest.get()
-                val mbTotales = bytes / (1024.0 * 1024.0)
-                val gbTotales = mbTotales / 1024.0
+                val gbTotales = bytes / (1024.0 * 1024.0 * 1024.0)
                 val totalPeticiones = udp + post + speed
-                val fecha = SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault()).format(Date())
+                val fecha = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
 
-                // Guardado local de respaldo
+                logToUI("📡 [SYNC CENTRAL] Transmitiendo métricas diarias de ID: $deviceId...")
+
+                // 1. Guardar copia local de respaldo
                 val prefs = getSharedPreferences("NetworkTesterStats", Context.MODE_PRIVATE)
-                prefs.edit().apply {
-                    putString("ULTIMO_REPORTE_FECHA", fecha)
-                    putFloat("ULTIMO_REPORTE_GB", gbTotales.toFloat())
-                    putLong("ULTIMO_REPORTE_PETICIONES", totalPeticiones)
-                    apply()
-                }
+                val historialAntiguo = prefs.getString("HISTORIAL_DIARIO", "") ?: ""
+                val nuevaEntrada = "📅 [$fecha] DevID: $deviceId -> GB: ${String.format(Locale.US, "%.3f", gbTotales)} | Peticiones: $totalPeticiones\n"
+                prefs.edit().putString("HISTORIAL_DIARIO", nuevaEntrada + historialAntiguo).apply()
 
-                val formBody = FormBody.Builder()
-                    .add("email", correoDestino)
-                    .add("_replyto", correoDestino)
-                    .add("_subject", "Reporte Diario NetworkTester - $fecha")
-                    .add("Fecha_Registro", fecha)
-                    .add("Peticiones_Totales", totalPeticiones.toString())
-                    .add("Rafagas_UDP", udp.toString())
-                    .add("Peticiones_POST_Cloud", post.toString())
-                    .add("Pruebas_SpeedTest", speed.toString())
-                    .add("Megabytes_Consumidos", String.format(Locale.US, "%.2f MB", mbTotales))
-                    .add("Gigabytes_Consumidos", String.format(Locale.US, "%.3f GB", gbTotales))
-                    .add("Modo_Ejecucion", "Modo x$multiplicador (64 Hilos)")
-                    .build()
+                // 2. Enviar JSON estructurado al endpoint central (Webhook / Firestore HTTP API)
+                val jsonPayload = """
+                    {
+                        "device_id": "$deviceId",
+                        "timestamp": "$fecha",
+                        "gigabytes_consumidos": ${String.format(Locale.US, "%.3f", gbTotales)},
+                        "peticiones_totales": $totalPeticiones,
+                        "rafagas_udp": $udp,
+                        "peticiones_post": $post,
+                        "speedtest_ping": $speed,
+                        "modo_ejecucion": "x$multiplicador"
+                    }
+                """.trimIndent()
 
+                val mediaType = "application/json; charset=utf-8".toMediaTypeOrNull()
+                val body = jsonPayload.toRequestBody(mediaType)
+
+                // Puedes reemplazar esta URL por tu Webhook de Google Sheets, Firebase Function o Supabase
                 val request = Request.Builder()
-                    .url("https://formspree.io/f/mqkvpaby")
-                    .post(formBody)
+                    .url("https://httpbin.org/post")
+                    .post(body)
                     .build()
 
                 client.newCall(request).execute().use { response ->
                     if (response.isSuccessful) {
-                        logToUI("✉️ [CORREO ENVIADO] Transmisión del día exitosa hacia $correoDestino")
+                        logToUI("✅ [SYNC EXITOSA] Datos de $deviceId registrados en el servidor.")
                     } else {
-                        logToUI("⚠️ [CORREO REINTENTANDO] Código HTTP: ${response.code}. Guardado localmente.")
+                        logToUI("⚠️ [SYNC ERROR HTTP] Código: ${response.code}. Guardado en local.")
                     }
                 }
             } catch (e: Exception) {
-                logToUI("⚠️ [SIN CONEXIÓN] Guardado localmente. Reintentará al conectar.")
+                logToUI("❌ [SYNC ERROR CONEXIÓN] ${e.localizedMessage}. Guardado localmente.")
             }
         }
     }
@@ -320,6 +309,7 @@ class NetworkService : Service() {
             putExtra("TOTAL_UDP", totalPeticionesUdp.get())
             putExtra("TOTAL_POST", totalPeticionesPost.get() + totalPeticionesSpeedTest.get())
             putExtra("TOTAL_BYTES", totalBytesDescargados.get())
+            putExtra("DEVICE_ID", deviceId)
             setPackage(packageName)
         }
         sendBroadcast(intent)
