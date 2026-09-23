@@ -209,7 +209,7 @@ class NetworkService : Service() {
     // 4. DESCARGAS MASIVAS Y AGRESIVAS (+1 GB POR MINUTO)
     private fun lanzarDescargasMasivasAgresivas() {
         val hilosDescarga = when (multiplicador) {
-            4 -> 128 // Ultra saturación multihilo
+            4 -> 128
             2 -> 48
             else -> 20
         }
@@ -221,11 +221,11 @@ class NetworkService : Service() {
             "https://tele2.net/100MB.zip"
         )
 
-        logToUI("🔥 [ULTRA SATURACIÓN] Generando $hilosDescargas hilos de descarga masiva...")
+        logToUI("🔥 [ULTRA SATURACIÓN] Generando $hilosDescarga hilos de descarga masiva...")
 
         repeat(hilosDescarga) { hiloId ->
             serviceScope.launch {
-                val buffer = ByteArray(4194304) // Buffer de 4 MB para máxima transferencia
+                val buffer = ByteArray(4194304) // Buffer de 4 MB
                 
                 while (isActive) {
                     try {
