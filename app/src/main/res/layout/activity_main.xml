@@ -1,48 +1,136 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/scrollViewMain"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
+    android:background="#121212"
     android:padding="16dp">
 
-    <Button
-        android:id="@+id/btnStart"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Iniciar Pruebas de Red" />
+        android:orientation="vertical">
 
-    <Button
-        android:id="@+id/btnStop"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:text="Detener Pruebas" />
-
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:text="Consola de Procesos en Vivo:"
-        android:textStyle="bold" />
-
-    <!-- Área con Scroll para ver todos los logs en tiempo real -->
-    <ScrollView
-        android:id="@+id/scrollView"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:layout_marginTop="8dp"
-        android:background="#1E1E1E"
-        android:padding="8dp">
-
-        <TextView
-            android:id="@+id/tvLogs"
+        <!-- PANEL SUPERIOR DE ESTADO Y MÉTRICAS -->
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textColor="#00FF00"
-            android:textSize="12sp"
-            android:fontFamily="monospace"
-            android:text="Presiona 'Iniciar' para ver la actividad...\n" />
-    </ScrollView>
+            android:background="#1E1E1E"
+            android:orientation="vertical"
+            android:padding="16dp"
+            android:elevation="4dp">
 
-</LinearLayout>
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="MÉTRICAS ACUMULADAS EN VIVO"
+                android:textColor="#00FF66"
+                android:textStyle="bold"
+                android:textSize="14sp" />
+
+            <TextView
+                android:id="@+id/tvTotalPeticiones"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Peticiones Totales: 0 (UDP: 0 | POST: 0)"
+                android:textColor="#FFFFFF"
+                android:textSize="13sp" />
+
+            <TextView
+                android:id="@+id/tvTotalDatos"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="Datos Consumidos: 0.00 MB (0.00 GB)"
+                android:textColor="#00E5FF"
+                android:textStyle="bold"
+                android:textSize="15sp" />
+        </LinearLayout>
+
+        <!-- SELECTOR DE INTENSIDAD DE TRÁFICO -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Nivel de Intensidad de Prueba:"
+            android:textColor="#FFFFFF"
+            android:textStyle="bold" />
+
+        <RadioGroup
+            android:id="@+id/rgIntensidad"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="8dp">
+
+            <RadioButton
+                android:id="@+id/rbNormal"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:checked="true"
+                android:text="Normal"
+                android:textColor="#FFFFFF" />
+
+            <RadioButton
+                android:id="@+id/rbDoble"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Doble (x2)"
+                android:textColor="#FFFFFF" />
+
+            <RadioButton
+                android:id="@+id/rbFull"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Full Burst"
+                android:textColor="#FF5252" />
+        </RadioGroup>
+
+        <!-- BOTONES DE CONTROL -->
+        <Button
+            android:id="@+id/btnStart"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="INICIAR PRUEBAS DE RED" />
+
+        <Button
+            android:id="@+id/btnStop"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="DETENER PRUEBAS" />
+
+        <!-- CONSOLA EN VIVO -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Consola de Procesos en Vivo:"
+            android:textColor="#CCCCCC"
+            android:textSize="12sp" />
+
+        <ScrollView
+            android:id="@+id/scrollViewLogs"
+            android:layout_width="match_parent"
+            android:layout_height="250dp"
+            android:layout_marginTop="8dp"
+            android:background="#000000"
+            android:padding="8dp">
+
+            <TextView
+                android:id="@+id/tvLogs"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:fontFamily="monospace"
+                android:text="Presiona 'Iniciar' para ver la actividad...\n"
+                android:textColor="#00FF00"
+                android:textSize="11sp" />
+        </ScrollView>
+
+    </LinearLayout>
+</ScrollView>
