@@ -1,184 +1,147 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/scrollViewMain"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#121212"
-    android:padding="16dp">
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:background="#121212">
 
+    <!-- Panel de Métricas -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical">
+        android:orientation="vertical"
+        android:padding="16dp"
+        android:background="#1E1E1E"
+        android:layout_marginBottom="16dp">
 
-        <!-- PANEL SUPERIOR DE ESTADO Y MÉTRICAS -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:background="#1E1E1E"
-            android:orientation="vertical"
-            android:padding="16dp"
-            android:elevation="4dp">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="MÉTRICAS ACUMULADAS EN VIVO"
-                android:textColor="#00FF66"
-                android:textStyle="bold"
-                android:textSize="14sp" />
-
-            <TextView
-                android:id="@+id/tvTotalPeticiones"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="Peticiones Totales: 0 (UDP: 0 | POST: 0)"
-                android:textColor="#FFFFFF"
-                android:textSize="13sp" />
-
-            <TextView
-                android:id="@+id/tvTotalDatos"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:text="Datos Consumidos: 0.00 MB (0.00 GB)"
-                android:textColor="#00E5FF"
-                android:textStyle="bold"
-                android:textSize="15sp" />
-        </LinearLayout>
-
-        <!-- SELECTOR DE INTENSIDAD DE TRÁFICO -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:text="Nivel de Intensidad de Prueba:"
-            android:textColor="#FFFFFF"
-            android:textStyle="bold" />
+            android:text="MÉTRICAS ACUMULADAS EN VIVO"
+            android:textColor="#00FF66"
+            android:textStyle="bold"
+            android:textSize="14sp" />
 
-        <RadioGroup
-            android:id="@+id/rgIntensidad"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginTop="8dp">
-
-            <RadioButton
-                android:id="@+id/rbNormal"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:checked="true"
-                android:text="Normal"
-                android:textColor="#FFFFFF" />
-
-            <RadioButton
-                android:id="@+id/rbDoble"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="Doble (x2)"
-                android:textColor="#FFFFFF" />
-
-            <RadioButton
-                android:id="@+id/rbFull"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="Full Burst"
-                android:textColor="#FF5252" />
-        </RadioGroup>
-
-        <!-- CONFIGURACIÓN DE CORREO Y REPORTE -->
         <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:text="Configuración de Reporte Nocturno:"
-            android:textColor="#FFFFFF"
-            android:textStyle="bold" />
-
-        <EditText
-            android:id="@+id/etEmail"
+            android:id="@+id/tvMetrics"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:background="#2A2A2A"
-            android:hint="Correo destino (ej. ing@empresa.com)"
-            android:padding="10dp"
-            android:textColor="#FFFFFF"
-            android:textColorHint="#888888"
-            android:textSize="13sp" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginTop="8dp">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Hora de envío (HH:MM 24h):"
-                android:textColor="#CCCCCC"
-                android:textSize="12sp" />
-
-            <EditText
-                android:id="@+id/etHoraEnvio"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:background="#2A2A2A"
-                android:hint="23:00"
-                android:padding="6dp"
-                android:text="23:00"
-                android:textColor="#00FF66"
-                android:textSize="13sp"
-                android:gravity="center"
-                android:layout_marginStart="8dp"/>
-        </LinearLayout>
-
-        <!-- BOTONES DE CONTROL -->
-        <Button
-            android:id="@+id/btnStart"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:text="INICIAR PRUEBAS Y PROGRAMAR REPORTE" />
-
-        <Button
-            android:id="@+id/btnStop"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="DETENER PRUEBAS" />
-
-        <!-- CONSOLA EN VIVO -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:text="Consola de Procesos en Vivo:"
-            android:textColor="#CCCCCC"
-            android:textSize="12sp" />
-
-        <ScrollView
-            android:id="@+id/scrollViewLogs"
-            android:layout_width="match_parent"
-            android:layout_height="220dp"
-            android:layout_marginTop="8dp"
-            android:background="#000000"
-            android:padding="8dp">
-
-            <TextView
-                android:id="@+id/tvLogs"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:fontFamily="monospace"
-                android:text="Presiona 'Iniciar' para ver la actividad...\n"
-                android:textColor="#00FF00"
-                android:textSize="11sp" />
-        </ScrollView>
-
+            android:text="Peticiones Totales: 0 (UDP: 0 | POST: 0)\nDatos Consumidos: 0.00 MB (0.000 GB)"
+            android:textColor="#00E5FF"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            android:layout_marginTop="8dp" />
     </LinearLayout>
-</ScrollView>
+
+    <!-- Opciones de Intensidad -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Nivel de Intensidad de Prueba:"
+        android:textColor="#FFFFFF"
+        android:textStyle="bold" />
+
+    <RadioGroup
+        android:id="@+id/rgIntensity"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginBottom="16dp">
+
+        <RadioButton
+            android:id="@+id/rbNormal"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Normal"
+            android:textColor="#FFFFFF"
+            android:checked="true" />
+
+        <RadioButton
+            android:id="@+id/rbDouble"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Doble (x2)"
+            android:textColor="#FFFFFF" />
+
+        <RadioButton
+            android:id="@+id/rbFull"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Full Burst"
+            android:textColor="#FF5252" />
+    </RadioGroup>
+
+    <!-- Configuración de Reporte -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Configuración de Reporte Nocturno:"
+        android:textColor="#FFFFFF"
+        android:textStyle="bold" />
+
+    <EditText
+        android:id="@+id/etEmail"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Correo destino (ej: usuario@gmail.com)"
+        android:textColor="#FFFFFF"
+        android:textColorHint="#888888"
+        android:inputType="textEmailAddress" />
+
+    <EditText
+        android:id="@+id/etReportTime"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Hora de envío (HH:MM 24h, ej: 23:00)"
+        android:textColor="#FFFFFF"
+        android:textColorHint="#888888"
+        android:inputType="time"
+        android:layout_marginBottom="16dp" />
+
+    <!-- Botones de Control -->
+    <Button
+        android:id="@+id/btnStart"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="INICIAR PRUEBAS Y PROGRAMAR REPORTE"
+        android:backgroundTint="#2E7D32"
+        android:textColor="#FFFFFF" />
+
+    <Button
+        android:id="@+id/btnStop"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="DETENER PRUEBAS"
+        android:backgroundTint="#C62828"
+        android:textColor="#FFFFFF"
+        android:layout_marginBottom="16dp" />
+
+    <!-- Consola de Salida -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Consola de Procesos en Vivo:"
+        android:textColor="#CCCCCC"
+        android:textSize="12sp" />
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="#000000"
+        android:padding="8dp">
+
+        <TextView
+            android:id="@+id/tvConsole"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Presiona 'Iniciar' para ver la actividad..."
+            android:textColor="#00FF00"
+            android:fontFamily="monospace"
+            android:textSize="11sp" />
+    </ScrollView>
+</LinearLayout>
