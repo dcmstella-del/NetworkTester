@@ -6,48 +6,50 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.os.Build
 import android.os.Bundle
+import android.text.method.ScrollingMovementMethod
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
+import java.util.Locale
 
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var tvMetrics: TextView
-    private lateinit var rgIntensity: RadioGroup
-    private lateinit var etEmail: EditText
-    private lateinit var etReportTime: EditText
-    private lateinit var btnStart: Button
-    private lateinit var btnStop: Button
+    private lateinit var tvDeviceId: TextView
+    private lateinit var tvPeticiones: TextView
+    private lateinit var tvConsumo: TextView
     private lateinit var tvConsole: TextView
+    private lateinit var etHoraReporte: EditText
+    private lateinit var btnIniciar: Button
+    private lateinit var btnEnviarAhora: Button
+    private lateinit var btnDetener: Button
+    private lateinit var rgIntensidad: RadioGroup
 
     private val metricsReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
-            val udp = intent?.getLongExtra("TOTAL_UDP", 0L) ?: 0L
-            val post = intent?.getLongExtra("TOTAL_POST", 0L) ?: 0L
-            val bytes = intent?.getLongExtra("TOTAL_BYTES", 0L) ?: 0L
+            intent?.let {
+                val udp = it.getLongExtra("TOTAL_UDP", 0)
+                val post = it.getLongExtra("TOTAL_POST", 0)
+                val bytes = it.getLongExtra("TOTAL_BYTES", 0)
+                val deviceId = it.getStringExtra("DEVICE_ID") ?: "UNKNOWN"
 
-            val totalPeticiones = udp + post
-            val mb = bytes / (1024.0 * 1024.0)
-            val gb = mb / 1024.0
+                val mb = bytes / (1024.0 * 1024.0)
+                val gb = mb / 1024.0
 
-            tvMetrics.text = String.format(
-                "Peticiones Totales: %d (UDP: %d | POST: %d)\nDatos Consumidos: %.2f MB (%.3f GB)",
-                totalPeticiones, udp, post, mb, gb
-            )
+                tvDeviceId.text = "Dispositivo: $deviceId"
+                tvPeticiones.text = "Peticiones Totales: ${udp + post} (UDP: $udp | POST/Ping: $post)"
+                tvConsumo.text = String.format(Locale.US, "Consumo: %.2f MB (%.3f GB)", mb, gb)
+            }
         }
     }
 
     private val logReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
-            val mensaje = intent?.getStringExtra("LOG_MESSAGE") ?: return
-            val textoActual = tvConsole.text.toString()
-            val lineas = textoActual.lines()
-            
-            val nuevoTexto = if (lineas.size > 30) {
-                lineas.takeLast(30).joinToString("\n") + "\n" + mensaje
-            } else {
-                if (textoActual.isEmpty()) mensaje else "$textoActual\n$mensaje"
+            intent?.getStringExtra("LOG_MESSAGE")?.let { mensaje ->
+                tvConsole.append("\n$mensaje")
+                val scrollAmount = tvConsole.layout?.getLineTop(tvConsole.lineCount) ?: 0
+                if (scrollAmount > tvConsole.height) {
+                    tvConsole.scrollTo(0, scrollAmount - tvConsole.height)
+                }
             }
-            tvConsole.text = nuevoTexto
         }
     }
 
@@ -55,25 +57,33 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        tvMetrics = findViewById(R.id.tvMetrics)
-        rgIntensity = findViewById(R.id.rgIntensity)
-        etEmail = findViewById(R.id.etEmail)
-        etReportTime = findViewById(R.id.etReportTime)
-        btnStart = findViewById(R.id.btnStart)
-        btnStop = findViewById(R.id.btnStop)
+        tvDeviceId = findViewById(R.id.tvDeviceId)
+        tvPeticiones = findViewById(R.id.tvPeticiones)
+        tvConsumo = findViewById(R.id.tvConsumo)
         tvConsole = findViewById(R.id.tvConsole)
+        etHoraReporte = findViewById(R.id.etHoraReporte)
+        btnIniciar = findViewById(R.id.btnIniciar)
+        btnEnviarAhora = findViewById(R.id.btnEnviarAhora)
+        btnDetener = findViewById(R.id.btnDetener)
+        rgIntensidad = findViewById(R.id.rgIntensidad)
 
-        btnStart.setOnClickListener {
-            val multiplicador = when (rgIntensity.checkedRadioButtonId) {
-                R.id.rbDouble -> 2
-                R.id.rbFull -> 4
+        tvConsole.movementMethod = ScrollingMovementMethod()
+
+        // Hora predeterminada 23:55
+        etHoraReporte.setText("23:55")
+
+        btnIniciar.setOnClickListener {
+            val mult = when (rgIntensidad.checkedRadioButtonId) {
+                R.id.rbBurst -> 4
+                R.id.rbDoble -> 2
                 else -> 1
             }
 
+            val horaProgramada = etHoraReporte.text.toString().trim()
+
             val serviceIntent = Intent(this, NetworkService::class.java).apply {
-                putExtra("MULTIPLICADOR", multiplicador)
-                putExtra("CORREO", etEmail.text.toString())
-                putExtra("HORA", etReportTime.text.toString())
+                putExtra("MULTIPLICADOR", mult)
+                putExtra("HORA_PROGRAMADA", horaProgramada)
             }
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -81,34 +91,34 @@ class MainActivity : AppCompatActivity() {
             } else {
                 startService(serviceIntent)
             }
+
+            Toast.makeText(this, "Pruebas iniciadas. Reporte diario a las $horaProgramada", Toast.LENGTH_SHORT).show()
         }
 
-        btnStop.setOnClickListener {
+        btnEnviarAhora.setOnClickListener {
+            val serviceIntent = Intent(this, NetworkService::class.java).apply {
+                action = "FORZAR_ENVIAR_METRICAS"
+            }
+            startService(serviceIntent)
+            Toast.makeText(this, "Enviando reporte manual a Google Sheets...", Toast.LENGTH_SHORT).show()
+        }
+
+        btnDetener.setOnClickListener {
             stopService(Intent(this, NetworkService::class.java))
+            Toast.makeText(this, "Pruebas detenidas", Toast.LENGTH_SHORT).show()
         }
     }
 
     override fun onResume() {
         super.onResume()
-        val filterMetrics = IntentFilter("com.example.networktester.METRICS_EVENT")
-        val filterLog = IntentFilter("com.example.networktester.LOG_EVENT")
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(metricsReceiver, filterMetrics, RECEIVER_EXPORTED)
-            registerReceiver(logReceiver, filterLog, RECEIVER_EXPORTED)
-        } else {
-            registerReceiver(metricsReceiver, filterMetrics)
-            registerReceiver(logReceiver, filterLog)
-        }
+        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.33) Context.RECEIVER_NOT_EXPORTED else 0
+        registerReceiver(metricsReceiver, IntentFilter("com.example.networktester.METRICS_EVENT"), flags)
+        registerReceiver(logReceiver, IntentFilter("com.example.networktester.LOG_EVENT"), flags)
     }
 
     override fun onPause() {
         super.onPause()
-        try {
-            unregisterReceiver(metricsReceiver)
-            unregisterReceiver(logReceiver)
-        } catch (e: Exception) {
-            // Ignorar des-registro previo
-        }
+        unregisterReceiver(metricsReceiver)
+        unregisterReceiver(logReceiver)
     }
 }
