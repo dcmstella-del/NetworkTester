@@ -26,6 +26,9 @@ import java.util.concurrent.atomic.AtomicLong
 
 class NetworkService : Service() {
 
+    // URL de tu Google Apps Script
+    private val URL_GOOGLE_SHEET = "https://script.google.com/macros/s/AKfycbwuBQg4vib23jPfmV8-sRqVA9Qw0MzIV89QE-yQF1jVJsMcppbkrFw9-jaWhUx-GPtt/exec"
+
     private val serviceJob = SupervisorJob()
     private val serviceScope = CoroutineScope(Dispatchers.IO + serviceJob)
 
@@ -36,8 +39,10 @@ class NetworkService : Service() {
 
     private val client = OkHttpClient.Builder()
         .dispatcher(dispatcher)
-        .connectTimeout(3, TimeUnit.SECONDS)
-        .readTimeout(5, TimeUnit.SECONDS)
+        .followRedirects(true)
+        .followSslRedirects(true)
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(10, TimeUnit.SECONDS)
         .build()
 
     private val totalPeticionesUdp = AtomicLong(0)
@@ -50,13 +55,13 @@ class NetworkService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        deviceId = obtenerOConstruirDeviceId()
+        deviceId = obtenerDeviceId()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val accion = intent?.action
         if (accion == "FORZAR_ENVIAR_METRICAS") {
-            enviarRegistroServidorCentral()
+            enviarRegistroAGoogleSheet()
             return START_STICKY
         }
 
@@ -65,14 +70,14 @@ class NetworkService : Service() {
         crearCanalNotificacion()
         val notification = NotificationCompat.Builder(this, "NetworkTesterChannel")
             .setContentTitle("NetworkTester - $deviceId")
-            .setContentText("Saturante activo (Modo x$multiplicador)...")
+            .setContentText("Ejecutando pruebas (x$multiplicador)...")
             .setSmallIcon(android.R.drawable.stat_sys_download)
             .setOngoing(true)
             .build()
 
         startForeground(1, notification)
 
-        logToUI("🚀 [ID DISPOSITIVO: $deviceId] Iniciando pruebas Full Burst x$multiplicador.")
+        logToUI("🚀 [DISPOSITIVO: $deviceId] Iniciando pruebas en modo Full Burst (x$multiplicador).")
 
         lanzarRafagasUdp()
         lanzarPeticionesPostCloud()
@@ -84,7 +89,7 @@ class NetworkService : Service() {
         return START_STICKY
     }
 
-    private fun obtenerOConstruirDeviceId(): String {
+    private fun obtenerDeviceId(): String {
         val androidId = Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID) ?: "UNKNOWN"
         val modelo = Build.MODEL.replace(" ", "_")
         return "${modelo}_${androidId.takeLast(6)}"
@@ -236,7 +241,7 @@ class NetworkService : Service() {
                 val horaActual = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
 
                 if (horaActual == "23:55" && !enviadoHoy) {
-                    enviarRegistroServidorCentral()
+                    enviarRegistroAGoogleSheet()
                     enviadoHoy = true
                 }
 
@@ -249,7 +254,7 @@ class NetworkService : Service() {
         }
     }
 
-    private fun enviarRegistroServidorCentral() {
+    private fun enviarRegistroAGoogleSheet() {
         serviceScope.launch {
             try {
                 val bytes = totalBytesDescargados.get()
@@ -258,21 +263,15 @@ class NetworkService : Service() {
                 val speed = totalPeticionesSpeedTest.get()
                 val gbTotales = bytes / (1024.0 * 1024.0 * 1024.0)
                 val totalPeticiones = udp + post + speed
-                val fecha = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
 
-                logToUI("📡 [SYNC CENTRAL] Transmitiendo métricas diarias de ID: $deviceId...")
+                val timestampCompleto = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
 
-                // 1. Guardar copia local de respaldo
-                val prefs = getSharedPreferences("NetworkTesterStats", Context.MODE_PRIVATE)
-                val historialAntiguo = prefs.getString("HISTORIAL_DIARIO", "") ?: ""
-                val nuevaEntrada = "📅 [$fecha] DevID: $deviceId -> GB: ${String.format(Locale.US, "%.3f", gbTotales)} | Peticiones: $totalPeticiones\n"
-                prefs.edit().putString("HISTORIAL_DIARIO", nuevaEntrada + historialAntiguo).apply()
+                logToUI("📊 [GOOGLE SHEET] Enviando reporte de $deviceId...")
 
-                // 2. Enviar JSON estructurado al endpoint central (Webhook / Firestore HTTP API)
                 val jsonPayload = """
                     {
                         "device_id": "$deviceId",
-                        "timestamp": "$fecha",
+                        "timestamp": "$timestampCompleto",
                         "gigabytes_consumidos": ${String.format(Locale.US, "%.3f", gbTotales)},
                         "peticiones_totales": $totalPeticiones,
                         "rafagas_udp": $udp,
@@ -285,21 +284,21 @@ class NetworkService : Service() {
                 val mediaType = "application/json; charset=utf-8".toMediaTypeOrNull()
                 val body = jsonPayload.toRequestBody(mediaType)
 
-                // Puedes reemplazar esta URL por tu Webhook de Google Sheets, Firebase Function o Supabase
                 val request = Request.Builder()
-                    .url("https://httpbin.org/post")
+                    .url(URL_GOOGLE_SHEET)
                     .post(body)
                     .build()
 
                 client.newCall(request).execute().use { response ->
                     if (response.isSuccessful) {
-                        logToUI("✅ [SYNC EXITOSA] Datos de $deviceId registrados en el servidor.")
+                        logToUI("✅ [SHEET EXITOSO] Datos guardados en Google Sheets.")
                     } else {
-                        logToUI("⚠️ [SYNC ERROR HTTP] Código: ${response.code}. Guardado en local.")
+                        logToUI("⚠️ [SHEET ERROR] Código de respuesta: ${response.code}")
                     }
                 }
+
             } catch (e: Exception) {
-                logToUI("❌ [SYNC ERROR CONEXIÓN] ${e.localizedMessage}. Guardado localmente.")
+                logToUI("❌ [ERROR TRANSMISIÓN] ${e.localizedMessage}")
             }
         }
     }
