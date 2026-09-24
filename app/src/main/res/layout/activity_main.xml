@@ -31,7 +31,7 @@
                 android:id="@+id/tvDeviceId"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Dispositivo: Causalizandose..."
+                android:text="Dispositivo: Conectando..."
                 android:textColor="#FFFFFF"
                 android:textSize="14sp"
                 android:layout_marginTop="4dp" />
@@ -56,11 +56,11 @@
                 android:layout_marginTop="4dp" />
         </LinearLayout>
 
-        <!-- SELECCIÓN DE INTENSIDAD -->
+        <!-- SELECCIÓN DE INTENSIDAD Y MODOS -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Intensidad de Saturación:"
+            android:text="Modo de Operación:"
             android:textColor="#FFFFFF"
             android:textStyle="bold"
             android:textSize="15sp"
@@ -70,33 +70,46 @@
             android:id="@+id/rgIntensidad"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
+            android:orientation="vertical"
             android:layout_marginBottom="16dp">
 
             <RadioButton
                 android:id="@+id/rbNormal"
-                android:layout_width="0dp"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="Normal"
+                android:text="Normal (Descarga moderada + Pings)"
                 android:textColor="#FFFFFF"
                 android:checked="true" />
 
             <RadioButton
                 android:id="@+id/rbDoble"
-                android:layout_width="0dp"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="Doble (x2)"
+                android:text="Doble x2 (Descarga media + Tráfico)"
                 android:textColor="#FFFFFF" />
 
             <RadioButton
                 android:id="@+id/rbFull"
-                android:layout_width="0dp"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1.2"
-                android:text="Full Burst"
+                android:text="Full Burst (Saturación de Ancho de Banda)"
                 android:textColor="#FF5252"
+                android:textStyle="bold" />
+
+            <RadioButton
+                android:id="@+id/rbRequestBurst"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Request Burst (Ráfagas masivas de Peticiones)"
+                android:textColor="#FFB74D"
+                android:textStyle="bold" />
+
+            <RadioButton
+                android:id="@+id/rbAutoCycle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Auto-Cycle (Cambia de modo cada 20s)"
+                android:textColor="#BA68C8"
                 android:textStyle="bold" />
         </RadioGroup>
 
