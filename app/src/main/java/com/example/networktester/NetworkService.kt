@@ -32,16 +32,16 @@ class NetworkService : Service() {
     private val serviceScope = CoroutineScope(Dispatchers.IO + serviceJob)
 
     private val dispatcher = Dispatcher().apply {
-        maxRequests = 500
-        maxRequestsPerHost = 100
+        maxRequests = 800
+        maxRequestsPerHost = 150
     }
 
     private val client = OkHttpClient.Builder()
         .dispatcher(dispatcher)
         .followRedirects(true)
         .followSslRedirects(true)
-        .connectTimeout(5, TimeUnit.SECONDS)
-        .readTimeout(5, TimeUnit.SECONDS)
+        .connectTimeout(4, TimeUnit.SECONDS)
+        .readTimeout(4, TimeUnit.SECONDS)
         .build()
 
     private val totalPeticionesUdp = AtomicLong(0)
@@ -49,8 +49,7 @@ class NetworkService : Service() {
     private val totalPeticionesSpeedTest = AtomicLong(0)
     private val totalBytesDescargados = AtomicLong(0)
 
-    private var multiplicador = 1
-    private var horaProgramada = "23:55"
+    private var modoActual = "NORMAL"
     private var deviceId = ""
 
     override fun onCreate() {
@@ -65,25 +64,28 @@ class NetworkService : Service() {
             return START_STICKY
         }
 
-        multiplicador = intent?.getIntExtra("MULTIPLICADOR", 1) ?: 1
-        horaProgramada = intent?.getStringExtra("HORA_PROGRAMADA") ?: "23:55"
+        modoActual = intent?.getStringExtra("MODO_OPERACION") ?: "NORMAL"
 
         crearCanalNotificacion()
         val notification = NotificationCompat.Builder(this, "NetworkTesterChannel")
             .setContentTitle("NetworkTester - $deviceId")
-            .setContentText("Ejecutando pruebas de red (x$multiplicador). Reporte minutal.")
+            .setContentText("Ejecutando modo: $modoActual. Reporte cada 1 min.")
             .setSmallIcon(android.R.drawable.stat_sys_download)
             .setOngoing(true)
             .build()
 
         startForeground(1, notification)
 
-        logToUI("🚀 [INICIO: $deviceId] Pruebas continuas activas con reporte automático cada 1 min.")
+        logToUI("🚀 [INICIO: $deviceId] Modo inicial: $modoActual.")
+
+        if (modoActual == "AUTO_CYCLE") {
+            lanzarCicloAutomatico()
+        }
 
         lanzarRafagasUdp()
         lanzarPeticionesPostCloud()
         lanzarSpeedTestLatencia()
-        lanzarDescargasModeradas()
+        lanzarDescargasOMasivas()
         lanzarSincronizadorPorMinuto()
         lanzarActualizadorUI()
 
@@ -105,21 +107,36 @@ class NetworkService : Service() {
         }
     }
 
-    // 1. PETICIONES UDP CONTINUAS
+    // CICLO AUTOMÁTICO CADA 20 SEGUNDOS
+    private fun lanzarCicloAutomatico() {
+        serviceScope.launch {
+            val listaModos = listOf("NORMAL", "DOBLE", "FULL_BURST", "REQUEST_BURST")
+            var idx = 0
+            while (isActive) {
+                modoActual = listaModos[idx % listaModos.size]
+                logToUI("🔄 [AUTO-CYCLE] Cambiando automáticamente a modo: $modoActual")
+                idx++
+                delay(20000) // Cambia cada 20 segundos
+            }
+        }
+    }
+
+    // 1. RÁFAGAS UDP
     private fun lanzarRafagasUdp() {
         serviceScope.launch {
             val trackerHost = "tracker.opentrackr.org"
             val port = 6969
-            val mensajeUdp = "PING_TEST_PACKET"
+            val mensajeUdp = "PING_BURST"
             val buffer = mensajeUdp.toByteArray()
 
-            val paquetesPorRafaga = when (multiplicador) {
-                4 -> 30
-                2 -> 15
-                else -> 5
-            }
-
             while (isActive) {
+                val paquetesPorRafaga = when (modoActual) {
+                    "FULL_BURST" -> 40
+                    "REQUEST_BURST" -> 60
+                    "DOBLE" -> 20
+                    else -> 10
+                }
+
                 try {
                     val address = InetAddress.getByName(trackerHost)
                     val socket = DatagramSocket()
@@ -128,7 +145,7 @@ class NetworkService : Service() {
                         socket.send(packet)
                         totalBytesDescargados.addAndGet(buffer.size.toLong())
                         val count = totalPeticionesUdp.incrementAndGet()
-                        if (count % 2000L == 0L) {
+                        if (count % 3000L == 0L) {
                             logToUI("🌊 [UDP] $count paquetes transmitidos.")
                         }
                     }
@@ -136,35 +153,30 @@ class NetworkService : Service() {
                 } catch (e: Exception) {
                     // Ignorar
                 }
-                delay(30)
+                delay(if (modoActual == "REQUEST_BURST") 10 else 25)
             }
         }
     }
 
     // 2. PETICIONES POST CONCURRENTES
     private fun lanzarPeticionesPostCloud() {
-        val hilosPost = when (multiplicador) {
-            4 -> 6
-            2 -> 3
-            else -> 1
-        }
-
         val urlPost = "https://httpbin.org/post"
         val mediaType = "application/json; charset=utf-8".toMediaTypeOrNull()
 
-        repeat(hilosPost) {
+        repeat(8) {
             serviceScope.launch {
                 while (isActive) {
                     try {
-                        val jsonPayload = "{\"device_id\":\"$deviceId\",\"status\":\"testing\"}"
+                        val payloadSize = if (modoActual == "REQUEST_BURST") 10 else 1000
+                        val jsonPayload = "{\"device_id\":\"$deviceId\",\"data\":\"" + "X".repeat(payloadSize) + "\"}"
                         val body = jsonPayload.toRequestBody(mediaType)
                         val request = Request.Builder().url(urlPost).post(body).build()
 
                         client.newCall(request).execute().use { response ->
                             if (response.isSuccessful) {
-                                totalBytesDescargados.addAndGet(300)
+                                totalBytesDescargados.addAndGet(200)
                                 val count = totalPeticionesPost.incrementAndGet()
-                                if (count % 200L == 0L) {
+                                if (count % 300L == 0L) {
                                     logToUI("☁️ [POST] $count peticiones confirmadas.")
                                 }
                             }
@@ -172,7 +184,7 @@ class NetworkService : Service() {
                     } catch (e: Exception) {
                         // Reintento
                     }
-                    delay(50)
+                    delay(if (modoActual == "REQUEST_BURST") 15 else 40)
                 }
             }
         }
@@ -195,7 +207,7 @@ class NetworkService : Service() {
 
                     client.newCall(request).execute().use {
                         val latencia = System.currentTimeMillis() - inicio
-                        totalBytesDescargados.addAndGet(250)
+                        totalBytesDescargados.addAndGet(150)
                         val count = totalPeticionesSpeedTest.incrementAndGet()
                         if (count % 50L == 0L) {
                             logToUI("⚡ [PING] #$count: ${latencia}ms")
@@ -204,29 +216,29 @@ class NetworkService : Service() {
                 } catch (e: Exception) {
                     // Ignorar
                 }
-                delay(200)
+                delay(if (modoActual == "REQUEST_BURST") 50 else 150)
             }
         }
     }
 
-    // 4. DESCARGAS CONTINUAS CON CONTROL DE MEMORIA RAM
-    private fun lanzarDescargasModeradas() {
-        val hilosDescarga = when (multiplicador) {
-            4 -> 6
-            2 -> 3
-            else -> 1
-        }
-
+    // 4. DESCARGAS CONTROLADAS (SE ADAPTAN SEGÚN EL MODO)
+    private fun lanzarDescargasOMasivas() {
         val cdnEndpoints = listOf(
             "https://speed.cloudflare.com/__down?bytes=10000000",
             "https://proof.ovh.net/files/10Mb.dat"
         )
 
-        repeat(hilosDescarga) { hiloId ->
+        repeat(6) { hiloId ->
             serviceScope.launch {
-                val buffer = ByteArray(32 * 1024) // Buffer de 32 KB para proteger la RAM
+                val buffer = ByteArray(32 * 1024)
                 
                 while (isActive) {
+                    // Si estamos en REQUEST_BURST, pausamos la descarga pesada para no gastar ancho de banda
+                    if (modoActual == "REQUEST_BURST") {
+                        delay(500)
+                        continue
+                    }
+
                     try {
                         val targetUrl = cdnEndpoints[hiloId % cdnEndpoints.size]
                         val request = Request.Builder().url(targetUrl).build()
@@ -236,7 +248,7 @@ class NetworkService : Service() {
                             var bytesRead: Int
 
                             if (inputStream != null) {
-                                while (inputStream.read(buffer).also { bytesRead = it } != -1 && isActive) {
+                                while (inputStream.read(buffer).also { bytesRead = it } != -1 && isActive && modoActual != "REQUEST_BURST") {
                                     if (bytesRead > 0) {
                                         totalBytesDescargados.addAndGet(bytesRead.toLong())
                                     }
@@ -284,7 +296,7 @@ class NetworkService : Service() {
                         "rafagas_udp": $udp,
                         "peticiones_post": $post,
                         "speedtest_ping": $speed,
-                        "modo_ejecucion": "x$multiplicador"
+                        "modo_ejecucion": "$modoActual"
                     }
                 """.trimIndent()
 
@@ -298,7 +310,7 @@ class NetworkService : Service() {
 
                 client.newCall(request).execute().use { response ->
                     if (response.isSuccessful) {
-                        logToUI("✅ [SHEET EXITO] Reporte de 1 minuto registrado.")
+                        logToUI("✅ [SHEET EXITO] Reporte enviado ($modoActual).")
                     } else {
                         logToUI("⚠️ [SHEET ERROR] Código: ${response.code}")
                     }
