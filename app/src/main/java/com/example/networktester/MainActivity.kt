@@ -23,6 +23,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var rbNormal: RadioButton
     private lateinit var rbDoble: RadioButton
     private lateinit var rbFull: RadioButton
+    private lateinit var rbRequestBurst: RadioButton
+    private lateinit var rbAutoCycle: RadioButton
 
     private lateinit var btnIniciar: Button
     private lateinit var btnDetener: Button
@@ -57,7 +59,6 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // Vincular vistas según las IDs exactas del XML
         tvDeviceId = findViewById(R.id.tvDeviceId)
         tvPeticiones = findViewById(R.id.tvPeticiones)
         tvConsumo = findViewById(R.id.tvConsumo)
@@ -70,19 +71,23 @@ class MainActivity : AppCompatActivity() {
         rbNormal = findViewById(R.id.rbNormal)
         rbDoble = findViewById(R.id.rbDoble)
         rbFull = findViewById(R.id.rbFull)
+        rbRequestBurst = findViewById(R.id.rbRequestBurst)
+        rbAutoCycle = findViewById(R.id.rbAutoCycle)
 
         btnIniciar = findViewById(R.id.btnIniciar)
         btnDetener = findViewById(R.id.btnDetener)
 
         btnIniciar.setOnClickListener {
-            val multiplicador = when {
-                rbFull.isChecked -> 4
-                rbDoble.isChecked -> 2
-                else -> 1
+            val modoSelected = when {
+                rbAutoCycle.isChecked -> "AUTO_CYCLE"
+                rbRequestBurst.isChecked -> "REQUEST_BURST"
+                rbFull.isChecked -> "FULL_BURST"
+                rbDoble.isChecked -> "DOBLE"
+                else -> "NORMAL"
             }
 
             val serviceIntent = Intent(this, NetworkService::class.java).apply {
-                putExtra("MULTIPLICADOR", multiplicador)
+                putExtra("MODO_OPERACION", modoSelected)
             }
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -94,7 +99,7 @@ class MainActivity : AppCompatActivity() {
             chkAutoSheets.isChecked = true
             tvEstadoSheets.text = "Sincronización a Google Sheets: TRANSMITIENDO (Cada 1 min)"
             tvEstadoSheets.setTextColor(android.graphics.Color.parseColor("#00FF66"))
-            Toast.makeText(this, "Pruebas iniciadas. Sincronización cada 1 min.", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Pruebas iniciadas en modo $modoSelected", Toast.LENGTH_SHORT).show()
         }
 
         btnDetener.setOnClickListener {
