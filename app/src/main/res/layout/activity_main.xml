@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#121212"
+    android:background="#0F172A"
     android:padding="16dp">
 
     <LinearLayout
@@ -10,200 +11,264 @@
         android:layout_height="wrap_content"
         android:orientation="vertical">
 
-        <!-- TARJETA DE MÉTRICAS -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:background="#1E1E1E"
-            android:orientation="vertical"
-            android:padding="16dp"
-            android:layout_marginBottom="16dp">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="MÉTRICAS EN TIEMPO REAL"
-                android:textColor="#00FF66"
-                android:textStyle="bold"
-                android:textSize="16sp" />
-
-            <TextView
-                android:id="@+id/tvDeviceId"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Dispositivo: Conectando..."
-                android:textColor="#FFFFFF"
-                android:textSize="14sp"
-                android:layout_marginTop="4dp" />
-
-            <TextView
-                android:id="@+id/tvPeticiones"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Peticiones Totales: 0 (UDP: 0 | POST/Ping: 0)"
-                android:textColor="#FFFFFF"
-                android:textSize="14sp"
-                android:layout_marginTop="4dp" />
-
-            <TextView
-                android:id="@+id/tvConsumo"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Consumo: 0 MB (0.00 GB)"
-                android:textColor="#00E5FF"
-                android:textStyle="bold"
-                android:textSize="15sp"
-                android:layout_marginTop="4dp" />
-        </LinearLayout>
-
-        <!-- SELECCIÓN DE INTENSIDAD Y MODOS -->
+        <!-- HEADER PRINCIPAL -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Modo de Operación:"
-            android:textColor="#FFFFFF"
+            android:text="NETWORK TESTER PRO"
+            android:textColor="#38BDF8"
+            android:textSize="20sp"
             android:textStyle="bold"
-            android:textSize="15sp"
-            android:layout_marginBottom="8dp" />
+            android:letterSpacing="0.05"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginBottom="16dp" />
 
-        <RadioGroup
-            android:id="@+id/rgIntensidad"
+        <!-- TARJETA DE MÉTRICAS -->
+        <androidx.cardview.widget.CardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
+            app:cardBackgroundColor="#1E293B"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="4dp"
             android:layout_marginBottom="16dp">
-
-            <RadioButton
-                android:id="@+id/rbNormal"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Normal (Descarga moderada + Pings)"
-                android:textColor="#FFFFFF"
-                android:checked="true" />
-
-            <RadioButton
-                android:id="@+id/rbDoble"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Doble x2 (Descarga media + Tráfico)"
-                android:textColor="#FFFFFF" />
-
-            <RadioButton
-                android:id="@+id/rbFull"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Full Burst (Saturación de Ancho de Banda)"
-                android:textColor="#FF5252"
-                android:textStyle="bold" />
-
-            <RadioButton
-                android:id="@+id/rbRequestBurst"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Request Burst (Ráfagas masivas de Peticiones)"
-                android:textColor="#FFB74D"
-                android:textStyle="bold" />
-
-            <RadioButton
-                android:id="@+id/rbAutoCycle"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Auto-Cycle (Cambia de modo cada 20s)"
-                android:textColor="#BA68C8"
-                android:textStyle="bold" />
-        </RadioGroup>
-
-        <!-- INDICADOR DE ENVÍO AUTOMÁTICO A SHEETS -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:background="#252525"
-            android:orientation="horizontal"
-            android:padding="12dp"
-            android:gravity="center_vertical"
-            android:layout_marginBottom="16dp">
-
-            <CheckBox
-                android:id="@+id/chkAutoSheets"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:checked="true"
-                android:enabled="false"
-                android:buttonTint="#00FF66" />
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:layout_marginStart="8dp">
+                android:padding="16dp">
 
                 <TextView
-                    android:id="@+id/tvEstadoSheets"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Sincronización a Google Sheets: ACTIVA"
-                    android:textColor="#00FF66"
+                    android:text="MÉTRICAS EN TIEMPO REAL"
+                    android:textColor="#4ADE80"
                     android:textStyle="bold"
-                    android:textSize="13sp" />
+                    android:textSize="13sp"
+                    android:letterSpacing="0.08" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#334155"
+                    android:layout_marginTop="8dp"
+                    android:layout_marginBottom="12dp" />
 
                 <TextView
+                    android:id="@+id/tvDeviceId"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Reporte automático generado cada 60 segundos"
-                    android:textColor="#AAAAAA"
-                    android:textSize="11sp" />
+                    android:text="Dispositivo: Conectando..."
+                    android:textColor="#94A3B8"
+                    android:textSize="13sp"
+                    android:layout_marginBottom="6dp" />
+
+                <TextView
+                    android:id="@+id/tvPeticiones"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Peticiones: 0 (UDP: 0 | POST/Ping: 0)"
+                    android:textColor="#F1F5F9"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="6dp" />
+
+                <TextView
+                    android:id="@+id/tvConsumo"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Consumo: 0 MB (0.00 GB)"
+                    android:textColor="#38BDF8"
+                    android:textStyle="bold"
+                    android:textSize="15sp" />
             </LinearLayout>
-        </LinearLayout>
+        </androidx.cardview.widget.CardView>
 
-        <!-- BOTONES DE CONTROL -->
-        <Button
-            android:id="@+id/btnIniciar"
-            android:layout_width="match_parent"
-            android:layout_height="55dp"
-            android:text="INICIAR PRUEBAS"
-            android:backgroundTint="#00C853"
-            android:textColor="#FFFFFF"
-            android:textStyle="bold"
-            android:textSize="15sp"
-            android:layout_marginBottom="10dp" />
-
-        <Button
-            android:id="@+id/btnDetener"
-            android:layout_width="match_parent"
-            android:layout_height="55dp"
-            android:text="DETENER PRUEBAS"
-            android:backgroundTint="#D50000"
-            android:textColor="#FFFFFF"
-            android:textStyle="bold"
-            android:textSize="15sp"
-            android:layout_marginBottom="16dp" />
-
-        <!-- CONSOLA DE LOGS EN VIVO -->
+        <!-- SELECCIÓN DE MODO DE OPERACIÓN -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Consola de Procesos en Vivo:"
-            android:textColor="#FFFFFF"
+            android:text="Modo de Operación"
+            android:textColor="#F1F5F9"
             android:textStyle="bold"
-            android:textSize="14sp"
+            android:textSize="15sp"
             android:layout_marginBottom="8dp" />
 
-        <ScrollView
-            android:id="@+id/scrollConsole"
+        <androidx.cardview.widget.CardView
             android:layout_width="match_parent"
-            android:layout_height="220dp"
-            android:background="#000000"
-            android:padding="8dp">
+            android:layout_height="wrap_content"
+            app:cardBackgroundColor="#1E293B"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="2dp"
+            android:layout_marginBottom="16dp">
 
-            <TextView
-                android:id="@+id/tvLogConsole"
+            <RadioGroup
+                android:id="@+id/rgIntensidad"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:fontFamily="monospace"
-                android:textColor="#00FF00"
-                android:textSize="11sp"
-                android:text="[ESPERA] Presiona INICIAR PRUEBAS para comenzar...\n" />
-        </ScrollView>
+                android:padding="12dp"
+                android:orientation="vertical">
+
+                <RadioButton
+                    android:id="@+id/rbNormal"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Normal"
+                    android:textColor="#E2E8F0"
+                    android:textSize="14sp"
+                    android:paddingStart="8dp"
+                    android:checked="true" />
+
+                <RadioButton
+                    android:id="@+id/rbDoble"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Doble x2"
+                    android:textColor="#E2E8F0"
+                    android:textSize="14sp"
+                    android:paddingStart="8dp" />
+
+                <RadioButton
+                    android:id="@+id/rbFull"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Full Burst"
+                    android:textColor="#EF4444"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:paddingStart="8dp" />
+
+                <RadioButton
+                    android:id="@+id/rbRequestBurst"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Request Burst"
+                    android:textColor="#F59E0B"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:paddingStart="8dp" />
+
+                <RadioButton
+                    android:id="@+id/rbAutoCycle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Auto-Cycle"
+                    android:textColor="#C084FC"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:paddingStart="8dp" />
+            </RadioGroup>
+        </androidx.cardview.widget.CardView>
+
+        <!-- INDICADOR DE ENVÍO AUTOMÁTICO A SHEETS -->
+        <androidx.cardview.widget.CardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:cardBackgroundColor="#064E3B"
+            app:cardCornerRadius="10dp"
+            android:layout_marginBottom="16dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:padding="12dp"
+                android:gravity="center_vertical">
+
+                <CheckBox
+                    android:id="@+id/chkAutoSheets"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:checked="true"
+                    android:enabled="false"
+                    android:buttonTint="#4ADE80" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:layout_marginStart="8dp">
+
+                    <TextView
+                        android:id="@+id/tvEstadoSheets"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Sincronización Sheets: ACTIVA"
+                        android:textColor="#4ADE80"
+                        android:textStyle="bold"
+                        android:textSize="13sp" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Sincronización automática cada 60s"
+                        android:textColor="#A7F3D0"
+                        android:textSize="11sp" />
+                </LinearLayout>
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
+
+        <!-- BOTONES DE ACCIÓN -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginBottom="16dp">
+
+            <Button
+                android:id="@+id/btnIniciar"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:text="INICIAR PRUEBAS"
+                android:backgroundTint="#16A34A"
+                android:textColor="#FFFFFF"
+                android:textStyle="bold"
+                android:textSize="14sp"
+                android:layout_marginBottom="8dp" />
+
+            <Button
+                android:id="@+id/btnDetener"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:text="DETENER PRUEBAS"
+                android:backgroundTint="#DC2626"
+                android:textColor="#FFFFFF"
+                android:textStyle="bold"
+                android:textSize="14sp" />
+        </LinearLayout>
+
+        <!-- CONSOLA DE LOGS -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Consola de Estado"
+            android:textColor="#94A3B8"
+            android:textStyle="bold"
+            android:textSize="13sp"
+            android:layout_marginBottom="6dp" />
+
+        <androidx.cardview.widget.CardView
+            android:layout_width="match_parent"
+            android:layout_height="180dp"
+            app:cardBackgroundColor="#020617"
+            app:cardCornerRadius="8dp">
+
+            <ScrollView
+                android:id="@+id/scrollConsole"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:padding="10dp">
+
+                <TextView
+                    android:id="@+id/tvLogConsole"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="monospace"
+                    android:textColor="#22C55E"
+                    android:textSize="11sp"
+                    android:text="[READY] Selecciona un modo e inicia...\n" />
+            </ScrollView>
+        </androidx.cardview.widget.CardView>
 
     </LinearLayout>
 </ScrollView>
