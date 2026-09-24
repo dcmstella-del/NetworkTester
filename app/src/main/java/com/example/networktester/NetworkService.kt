@@ -32,16 +32,16 @@ class NetworkService : Service() {
     private val serviceScope = CoroutineScope(Dispatchers.IO + serviceJob)
 
     private val dispatcher = Dispatcher().apply {
-        maxRequests = 1000
-        maxRequestsPerHost = 200
+        maxRequests = 500
+        maxRequestsPerHost = 100
     }
 
     private val client = OkHttpClient.Builder()
         .dispatcher(dispatcher)
         .followRedirects(true)
         .followSslRedirects(true)
-        .connectTimeout(3, TimeUnit.SECONDS)
-        .readTimeout(3, TimeUnit.SECONDS)
+        .connectTimeout(5, TimeUnit.SECONDS)
+        .readTimeout(5, TimeUnit.SECONDS)
         .build()
 
     private val totalPeticionesUdp = AtomicLong(0)
@@ -71,19 +71,19 @@ class NetworkService : Service() {
         crearCanalNotificacion()
         val notification = NotificationCompat.Builder(this, "NetworkTesterChannel")
             .setContentTitle("NetworkTester - $deviceId")
-            .setContentText("Generando peticiones continuas (x$multiplicador). Reporte cada 1 min.")
+            .setContentText("Ejecutando pruebas de red (x$multiplicador). Reporte minutal.")
             .setSmallIcon(android.R.drawable.stat_sys_download)
             .setOngoing(true)
             .build()
 
         startForeground(1, notification)
 
-        logToUI("🚀 [INICIO DISPOSITIVO: $deviceId] Peticiones continuas activas (Reporte cada 1 min).")
+        logToUI("🚀 [INICIO: $deviceId] Pruebas continuas activas con reporte automático cada 1 min.")
 
         lanzarRafagasUdp()
         lanzarPeticionesPostCloud()
         lanzarSpeedTestLatencia()
-        lanzarPeticionesLivianasMasivas()
+        lanzarDescargasModeradas()
         lanzarSincronizadorPorMinuto()
         lanzarActualizadorUI()
 
@@ -105,18 +105,18 @@ class NetworkService : Service() {
         }
     }
 
-    // 1. RÁFAGAS UDP MASIVAS (Paquetes diminutos de red)
+    // 1. PETICIONES UDP CONTINUAS
     private fun lanzarRafagasUdp() {
         serviceScope.launch {
             val trackerHost = "tracker.opentrackr.org"
             val port = 6969
-            val mensajeUdp = "PING_TEST"
+            val mensajeUdp = "PING_TEST_PACKET"
             val buffer = mensajeUdp.toByteArray()
 
             val paquetesPorRafaga = when (multiplicador) {
-                4 -> 50
-                2 -> 25
-                else -> 10
+                4 -> 30
+                2 -> 15
+                else -> 5
             }
 
             while (isActive) {
@@ -128,25 +128,25 @@ class NetworkService : Service() {
                         socket.send(packet)
                         totalBytesDescargados.addAndGet(buffer.size.toLong())
                         val count = totalPeticionesUdp.incrementAndGet()
-                        if (count % 5000L == 0L) {
-                            logToUI("🌊 [UDP] $count peticiones transmitidas.")
+                        if (count % 2000L == 0L) {
+                            logToUI("🌊 [UDP] $count paquetes transmitidos.")
                         }
                     }
                     socket.close()
                 } catch (e: Exception) {
-                    // Ignorar errores
+                    // Ignorar
                 }
-                delay(20)
+                delay(30)
             }
         }
     }
 
-    // 2. PETICIONES POST CONCURRENTES (Payload diminuto)
+    // 2. PETICIONES POST CONCURRENTES
     private fun lanzarPeticionesPostCloud() {
         val hilosPost = when (multiplicador) {
-            4 -> 10
-            2 -> 5
-            else -> 2
+            4 -> 6
+            2 -> 3
+            else -> 1
         }
 
         val urlPost = "https://httpbin.org/post"
@@ -156,29 +156,29 @@ class NetworkService : Service() {
             serviceScope.launch {
                 while (isActive) {
                     try {
-                        val jsonPayload = "{\"id\":\"$deviceId\"}"
+                        val jsonPayload = "{\"device_id\":\"$deviceId\",\"status\":\"testing\"}"
                         val body = jsonPayload.toRequestBody(mediaType)
                         val request = Request.Builder().url(urlPost).post(body).build()
 
                         client.newCall(request).execute().use { response ->
                             if (response.isSuccessful) {
-                                totalBytesDescargados.addAndGet(150)
+                                totalBytesDescargados.addAndGet(300)
                                 val count = totalPeticionesPost.incrementAndGet()
-                                if (count % 500L == 0L) {
-                                    logToUI("☁️ [POST] $count peticiones enviadas.")
+                                if (count % 200L == 0L) {
+                                    logToUI("☁️ [POST] $count peticiones confirmadas.")
                                 }
                             }
                         }
                     } catch (e: Exception) {
                         // Reintento
                     }
-                    delay(30)
+                    delay(50)
                 }
             }
         }
     }
 
-    // 3. PETICIONES HEAD / PING CONTINUO
+    // 3. SPEEDTEST Y LATENCIA
     private fun lanzarSpeedTestLatencia() {
         serviceScope.launch {
             val pingEndpoints = listOf(
@@ -193,60 +193,69 @@ class NetworkService : Service() {
                     val inicio = System.currentTimeMillis()
                     val request = Request.Builder().url(target).build()
 
-                    client.newCall(request).execute().use { response ->
+                    client.newCall(request).execute().use {
                         val latencia = System.currentTimeMillis() - inicio
-                        totalBytesDescargados.addAndGet(200)
+                        totalBytesDescargados.addAndGet(250)
                         val count = totalPeticionesSpeedTest.incrementAndGet()
-                        if (count % 100L == 0L) {
+                        if (count % 50L == 0L) {
                             logToUI("⚡ [PING] #$count: ${latencia}ms")
                         }
                     }
                 } catch (e: Exception) {
                     // Ignorar
                 }
-                delay(100)
+                delay(200)
             }
         }
     }
 
-    // 4. PETICIONES HTTP LIVIANAS (Alto número de peticiones sin consumo alto de megabytes)
-    private fun lanzarPeticionesLivianasMasivas() {
-        val hilosPeticiones = when (multiplicador) {
-            4 -> 16
-            2 -> 8
-            else -> 4
+    // 4. DESCARGAS CONTINUAS CON CONTROL DE MEMORIA RAM
+    private fun lanzarDescargasModeradas() {
+        val hilosDescarga = when (multiplicador) {
+            4 -> 6
+            2 -> 3
+            else -> 1
         }
 
-        val endpointsLivianos = listOf(
-            "https://www.google.com/generate_204",
-            "https://connectivitycheck.gstatic.com/generate_204",
-            "https://1.1.1.1/cdn-cgi/trace"
+        val cdnEndpoints = listOf(
+            "https://speed.cloudflare.com/__down?bytes=10000000",
+            "https://proof.ovh.net/files/10Mb.dat"
         )
 
-        repeat(hilosPeticiones) { hiloId ->
+        repeat(hilosDescarga) { hiloId ->
             serviceScope.launch {
+                val buffer = ByteArray(32 * 1024) // Buffer de 32 KB para proteger la RAM
+                
                 while (isActive) {
                     try {
-                        val targetUrl = endpointsLivianos[hiloId % endpointsLivianos.size]
-                        val request = Request.Builder().url(targetUrl).head().build() // Solicitud HEAD: Solo encabezados
+                        val targetUrl = cdnEndpoints[hiloId % cdnEndpoints.size]
+                        val request = Request.Builder().url(targetUrl).build()
 
                         client.newCall(request).execute().use { response ->
-                            totalBytesDescargados.addAndGet(300) // Consumo mínimo de pocos bytes
+                            val inputStream: InputStream? = response.body?.byteStream()
+                            var bytesRead: Int
+
+                            if (inputStream != null) {
+                                while (inputStream.read(buffer).also { bytesRead = it } != -1 && isActive) {
+                                    if (bytesRead > 0) {
+                                        totalBytesDescargados.addAndGet(bytesRead.toLong())
+                                    }
+                                }
+                            }
                         }
                     } catch (e: Exception) {
-                        delay(50)
+                        delay(200)
                     }
-                    delay(20)
                 }
             }
         }
     }
 
-    // 5. ENVIAR REPORTE AUTOMÁTICO CADA 1 MINUTO
+    // 5. REPORTE AUTOMÁTICO CADA 1 MINUTO
     private fun lanzarSincronizadorPorMinuto() {
         serviceScope.launch {
             while (isActive) {
-                delay(60000) // Esperar exactamente 60 segundos (1 minuto)
+                delay(60000) // 1 minuto
                 enviarRegistroAGoogleSheet()
             }
         }
@@ -264,7 +273,7 @@ class NetworkService : Service() {
 
                 val timestampCompleto = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
 
-                logToUI("📊 [AUTO-REPORTE] Enviando reporte de 1 minuto a Sheets...")
+                logToUI("📊 [AUTO-REPORTE] Enviando métricas del minuto a Sheets...")
 
                 val jsonPayload = """
                     {
@@ -289,7 +298,7 @@ class NetworkService : Service() {
 
                 client.newCall(request).execute().use { response ->
                     if (response.isSuccessful) {
-                        logToUI("✅ [SHEET MINUTAL] Reporte automático de 1 min enviado con éxito.")
+                        logToUI("✅ [SHEET EXITO] Reporte de 1 minuto registrado.")
                     } else {
                         logToUI("⚠️ [SHEET ERROR] Código: ${response.code}")
                     }
